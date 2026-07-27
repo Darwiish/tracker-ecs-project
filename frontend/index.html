@@ -7,15 +7,83 @@
   </head>
   <body>
     <div class="container">
-      <h1>DevOps Project Tracker</h1>
-
+      <div class="app-header">
+        <svg
+          class="logo"
+          viewBox="0 0 400 400"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <g
+            fill="none"
+            stroke="#2563eb"
+            stroke-width="16"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M200 40
+            c14 0 28 2 41 6
+            l4 28 c10 4 19 9 27 15
+            l26 -12
+            c20 16 36 36 47 59
+            l-18 22
+            c3 10 5 20 5 30
+            s-2 20 -5 30
+            l18 22
+            c-11 23 -27 43 -47 59
+            l-26 -12
+            c-8 6 -17 11 -27 15
+            l-4 28
+            c-13 4 -27 6 -41 6
+            s-28 -2 -41 -6
+            l-4 -28
+            c-10 -4 -19 -9 -27 -15
+            l-26 12
+            c-20 -16 -36 -36 -47 -59
+            l18 -22
+            c-3 -10 -5 -20 -5 -30
+            s2 -20 5 -30
+            l-18 -22
+            c11 -23 27 -43 47 -59
+            l26 12
+            c8 -6 17 -11 27 -15
+            l4 -28
+            c13 -4 27 -6 41 -6z"
+            />
+            <circle cx="200" cy="188" r="78" />
+          </g>
+          <text
+            x="200"
+            y="210"
+            text-anchor="middle"
+            font-family="Arial, sans-serif"
+            font-size="72"
+            font-weight="bold"
+            fill="#2563eb"
+          >
+            DT
+          </text>
+        </svg>
+        <h1>DevOps Project Tracker</h1>
+      </div>
       <div class="add-task">
         <input type="text" id="taskInput" placeholder="Task Name" />
+        <input type="date" id="dueDateInput" />
         <button id="addTaskBtn">Add Task</button>
       </div>
 
       <h2>Current Tasks</h2>
-      <ul id="taskList"></ul>
+      <input type="text" id="searchInput" placeholder="Search tasks..." />
+      <table id="taskTable">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Due Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="taskList"></tbody>
+      </table>
     </div>
 
     <script src="app.js"></script>
