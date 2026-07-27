@@ -3,10 +3,23 @@ const pool = require("../db");
 
 const router = express.Router();
 
-// GET /tasks
+const VALID_STATUSES = ["Todo", "In Progress", "Done"];
+
+// GET /tasks?search=term
 router.get("/", async (req, res) => {
+  const { search } = req.query;
   try {
-    const result = await pool.query("SELECT * FROM tasks ORDER BY id ASC");
+    let result;
+    if (search) {
+      result = await pool.query(
+        "SELECT id, name, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date FROM tasks WHERE name ILIKE $1 ORDER BY id ASC",
+        [`%${search}%`],
+      );
+    } else {
+      result = await pool.query(
+        "SELECT id, name, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date FROM tasks ORDER BY id ASC",
+      );
+    }
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -16,12 +29,15 @@ router.get("/", async (req, res) => {
 
 // POST /tasks
 router.post("/", async (req, res) => {
-  const { name } = req.body;
+  const { name, due_date } = req.body;
   if (!name) {
     return res.status(400).json({ message: "Task name is required" });
   }
   try {
-    await pool.query("INSERT INTO tasks (name) VALUES ($1)", [name]);
+    await pool.query(
+      "INSERT INTO tasks (name, status, due_date) VALUES ($1, $2, $3)",
+      [name, "Todo", due_date || null],
+    );
     res.json({ message: "Task added" });
   } catch (err) {
     console.error(err);
@@ -29,10 +45,10 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PUT /tasks/:id
+// PUT /tasks/:id  (update name and/or due date)
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { name } = req.body;
+  const { name, due_date } = req.body;
 
   if (!name) {
     return res.status(400).json({ message: "Task name is required" });
@@ -40,13 +56,37 @@ router.put("/:id", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "UPDATE tasks SET name = $1 WHERE id = $2",
-      [name, id],
+      "UPDATE tasks SET name = $1, due_date = $2 WHERE id = $3",
+      [name, due_date || null, id],
     );
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "Task not found" });
     }
     res.json({ message: "Task updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// PATCH /tasks/:id/status
+router.patch("/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
+  try {
+    const result = await pool.query(
+      "UPDATE tasks SET status = $1 WHERE id = $2",
+      [status, id],
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    res.json({ message: "Status updated" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
