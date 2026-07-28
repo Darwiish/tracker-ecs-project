@@ -3,16 +3,18 @@ const cors = require("cors");
 require("dotenv").config();
 
 const taskRoutes = require("./routes/tasks");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+app.use("/auth", authRoutes);
 app.use("/tasks", taskRoutes);
 
 app.get("/", (req, res) => {
-  res.send("DevOps Project Tracker API is running");
+  res.send("DevOps Project Tracker API is running 🚀");
 });
 
 const PORT = process.env.PORT || 5000;
