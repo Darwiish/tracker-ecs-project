@@ -6,9 +6,9 @@ const router = express.Router();
 
 const VALID_STATUSES = ["Todo", "In Progress", "Done"];
 
+// GET /tasks?search=term
 router.use(authenticateToken);
 
-// GET /tasks?search=term
 router.get("/", async (req, res) => {
   const { search } = req.query;
   const userId = req.user.id;
@@ -17,12 +17,12 @@ router.get("/", async (req, res) => {
     let result;
     if (search) {
       result = await pool.query(
-        "SELECT id, name, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date FROM tasks WHERE user_id = $1 AND name ILIKE $2 ORDER BY id ASC",
+        "SELECT id, name, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date FROM tasks WHERE user_id = $1 AND name ILIKE $2 ORDER BY due_date ASC NULLS LAST, id ASC",
         [userId, `%${search}%`],
       );
     } else {
       result = await pool.query(
-        "SELECT id, name, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date FROM tasks WHERE user_id = $1 ORDER BY id ASC",
+        "SELECT id, name, status, TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date FROM tasks WHERE user_id = $1 ORDER BY due_date ASC NULLS LAST, id ASC",
         [userId],
       );
     }
