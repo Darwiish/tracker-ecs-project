@@ -115,6 +115,11 @@
           <button class="filter-btn" data-filter="Done">Done</button>
         </div>
 
+        <div class="view-toggle">
+          <button id="tableViewBtn" class="view-btn active">Table View</button>
+          <button id="boardViewBtn" class="view-btn">Board View</button>
+        </div>
+
         <div class="add-task">
           <input type="text" id="taskInput" placeholder="Task Name" />
           <input type="date" id="dueDateInput" />
@@ -134,9 +139,29 @@
           </thead>
           <tbody id="taskList"></tbody>
         </table>
+
+        <div id="boardView" class="board-view" style="display: none">
+          <div class="board-column" data-status="Todo">
+            <h3>Todo <span class="column-count" id="countTodo">0</span></h3>
+            <div class="column-cards" id="cardsTodo"></div>
+          </div>
+          <div class="board-column" data-status="In Progress">
+            <h3>
+              In Progress
+              <span class="column-count" id="countInProgress">0</span>
+            </h3>
+            <div class="column-cards" id="cardsInProgress"></div>
+          </div>
+          <div class="board-column" data-status="Done">
+            <h3>Done <span class="column-count" id="countDone">0</span></h3>
+            <div class="column-cards" id="cardsDone"></div>
+          </div>
+        </div>
+
+        <div id="paginationBar" class="pagination-bar"></div>
       </div>
     </div>
-    <div id="paginationBar" class="pagination-bar"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

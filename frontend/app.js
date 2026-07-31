@@ -6,6 +6,58 @@ let isRegisterMode = false;
 let currentFilter = "All";
 let allTasks = [];
 let currentPage = 1;
+let currentView = "table";
+let sortableInstances = [];
+
+// --- Icon helpers ---
+const PEN_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const BIN_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>`;
+
+const RESTORE_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M3 11a9 9 0 1 1 2.6 6.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3 5v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+function createEditButton(task) {
+  const btn = document.createElement("button");
+  btn.className = "icon-btn edit-icon-btn";
+  btn.innerHTML = PEN_ICON_SVG;
+  btn.title = "Edit task";
+  btn.setAttribute("aria-label", "Edit task");
+  btn.onclick = () => editTask(task);
+  return btn;
+}
+
+function createDeleteButton(id, name) {
+  const btn = document.createElement("button");
+  btn.className = "icon-btn delete-icon-btn";
+  btn.innerHTML = BIN_ICON_SVG;
+  btn.title = "Delete task";
+  btn.setAttribute("aria-label", "Delete task");
+  btn.onclick = () => deleteTask(id, name);
+  return btn;
+}
+
+function createRestoreButton(id) {
+  const btn = document.createElement("button");
+  btn.className = "icon-btn restore-icon-btn";
+  btn.innerHTML = RESTORE_ICON_SVG;
+  btn.title = "Restore to In Progress";
+  btn.setAttribute("aria-label", "Restore to In Progress");
+  btn.onclick = () => updateStatus(id, "In Progress");
+  return btn;
+}
 
 // --- Toast helper ---
 let toastTimeout;
@@ -216,24 +268,12 @@ function renderTasks(tasks) {
     const actionsTd = document.createElement("td");
     actionsTd.setAttribute("data-label", "Actions");
 
-    // Restore button only shows for Done tasks
     if (task.status === "Done") {
-      const restoreBtn = document.createElement("button");
-      restoreBtn.textContent = "Restore";
-      restoreBtn.onclick = () => updateStatus(task.id, "In Progress");
-      actionsTd.appendChild(restoreBtn);
+      actionsTd.appendChild(createRestoreButton(task.id));
     }
 
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "Edit";
-    editBtn.onclick = () => editTask(task);
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = "Delete";
-    deleteBtn.onclick = () => deleteTask(task.id, task.name);
-
-    actionsTd.appendChild(editBtn);
-    actionsTd.appendChild(deleteBtn);
+    actionsTd.appendChild(createEditButton(task));
+    actionsTd.appendChild(createDeleteButton(task.id, task.name));
 
     tr.appendChild(nameTd);
     tr.appendChild(dueTd);
@@ -244,6 +284,10 @@ function renderTasks(tasks) {
   });
 
   renderPagination(tasks.length, totalPages);
+
+  if (currentView === "board") {
+    renderBoard(tasks);
+  }
 }
 
 function renderPagination(totalItems, totalPages) {
@@ -276,6 +320,100 @@ function renderPagination(totalItems, totalPages) {
   bar.appendChild(nextBtn);
 }
 
+// --- Kanban board view ---
+function renderBoard(tasks) {
+  const columns = {
+    Todo: document.getElementById("cardsTodo"),
+    "In Progress": document.getElementById("cardsInProgress"),
+    Done: document.getElementById("cardsDone"),
+  };
+
+  Object.values(columns).forEach((col) => (col.innerHTML = ""));
+
+  const counts = { Todo: 0, "In Progress": 0, Done: 0 };
+
+  tasks.forEach((task) => {
+    counts[task.status]++;
+
+    const card = document.createElement("div");
+    card.className = "task-card";
+    card.dataset.taskId = task.id;
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "card-name";
+    nameEl.textContent = task.name;
+
+    const dueEl = document.createElement("div");
+    dueEl.className = "card-due";
+    dueEl.textContent = task.due_date ? `Due: ${task.due_date}` : "No due date";
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "card-actions";
+    if (task.status === "Done") {
+      actionsEl.appendChild(createRestoreButton(task.id));
+    }
+    actionsEl.appendChild(createEditButton(task));
+    actionsEl.appendChild(createDeleteButton(task.id, task.name));
+
+    card.appendChild(nameEl);
+    card.appendChild(dueEl);
+    card.appendChild(actionsEl);
+
+    columns[task.status].appendChild(card);
+  });
+
+  document.getElementById("countTodo").textContent = counts["Todo"];
+  document.getElementById("countInProgress").textContent =
+    counts["In Progress"];
+  document.getElementById("countDone").textContent = counts["Done"];
+
+  setupDragAndDrop();
+}
+
+function setupDragAndDrop() {
+  sortableInstances.forEach((s) => s.destroy());
+  sortableInstances = [];
+
+  document.querySelectorAll(".column-cards").forEach((columnEl) => {
+    const sortable = Sortable.create(columnEl, {
+      group: "tasks",
+      animation: 150,
+      forceFallback: true,
+      fallbackTolerance: 3,
+      onAdd: (evt) => {
+        const taskId = evt.item.dataset.taskId;
+        const newStatus = evt.to.closest(".board-column").dataset.status;
+        updateStatus(taskId, newStatus);
+      },
+    });
+    sortableInstances.push(sortable);
+  });
+}
+
+function switchView(view) {
+  currentView = view;
+  const tableEl = document.getElementById("taskTable");
+  const boardEl = document.getElementById("boardView");
+  const paginationEl = document.getElementById("paginationBar");
+
+  if (view === "table") {
+    tableEl.style.display = "table";
+    boardEl.style.display = "none";
+    paginationEl.style.display = "flex";
+    document.getElementById("tableViewBtn").classList.add("active");
+    document.getElementById("boardViewBtn").classList.remove("active");
+    renderTasks(applyFilter(allTasks));
+  } else {
+    tableEl.style.display = "none";
+    boardEl.style.display = "flex";
+    paginationEl.style.display = "none";
+    document.getElementById("tableViewBtn").classList.remove("active");
+    document.getElementById("boardViewBtn").classList.add("active");
+    renderBoard(applyFilter(allTasks));
+  }
+}
+
+// --- Edit / Update / Delete / Add ---
 function editTask(task) {
   const newName = prompt("Edit task name:", task.name);
   if (newName === null || newName.trim() === "") return;
@@ -396,9 +534,20 @@ document.querySelectorAll(".filter-btn").forEach((btn) => {
       .querySelectorAll(".filter-btn")
       .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    renderTasks(applyFilter(allTasks));
+    if (currentView === "board") {
+      renderBoard(applyFilter(allTasks));
+    } else {
+      renderTasks(applyFilter(allTasks));
+    }
   });
 });
+
+document
+  .getElementById("tableViewBtn")
+  .addEventListener("click", () => switchView("table"));
+document
+  .getElementById("boardViewBtn")
+  .addEventListener("click", () => switchView("board"));
 
 // --- Init ---
 if (getToken()) {
