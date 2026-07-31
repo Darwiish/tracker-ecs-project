@@ -1,12 +1,12 @@
 body {
   font-family: Arial, sans-serif;
-  background: #dde6f5;
+  background: #b5bcc9;
   margin: 0;
   padding: 40px;
 }
 
 .container {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
   background: #fff;
   padding: 20px;
@@ -75,13 +75,6 @@ body {
   text-align: center;
   min-height: 18px;
 }
-.user-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 16px;
-}
 
 .user-bar {
   display: flex;
@@ -149,6 +142,256 @@ td button {
   cursor: pointer;
 }
 
+button {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+button:hover {
+  background-color: #1d4ed8;
+}
+
+button:active {
+  background-color: #1e40af;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.stats-bar {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #444;
+}
+
+.stats-bar span {
+  background: #f4f4f4;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-btn {
+  background: #e5e7eb;
+  color: #333;
+}
+
+.filter-btn:hover {
+  background: #d5e0f5;
+}
+
+.filter-btn.active {
+  background: #15803d;
+  color: #fff;
+}
+
+.pagination-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pagination-bar button {
+  padding: 6px 12px;
+}
+
+.pagination-bar button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.pagination-bar span {
+  font-size: 14px;
+  color: #555;
+}
+
+#toastBar {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #fff;
+  z-index: 1000;
+  display: none;
+}
+
+#toastBar.show {
+  display: block;
+}
+
+#toastBar.error {
+  background: #dc2626;
+}
+
+#toastBar.success {
+  background: #16a34a;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.view-btn {
+  background: #e5e7eb;
+  color: #333;
+}
+
+.view-btn:hover {
+  background: #d1d5db;
+}
+
+.view-btn.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* Kanban board */
+.board-view {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.board-column {
+  flex: 1;
+  background: #b5bcc9;
+  border: 1px solid #e5decb;
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 200px;
+}
+
+.board-column h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+  color: #6b6152;
+  margin: 4px 0 10px 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.column-count {
+  background: #fdfbf3;
+  border: 1px solid #e5decb;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #6b6152;
+}
+
+.column-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 60px;
+}
+
+.column-cards.drag-over {
+  background: rgba(180, 160, 100, 0.12);
+  border-radius: 6px;
+}
+
+.task-card {
+  background: #f0ead0;
+  border: 1px solid #e5decb;
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+}
+
+.task-card:active {
+  cursor: grabbing;
+}
+
+.task-card .card-name {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: #3f3a2e;
+}
+
+.task-card .card-due {
+  font-size: 12px;
+  color: #36332c;
+  margin-bottom: 8px;
+}
+
+.task-card .card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.task-card .card-actions button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+/* Icon buttons (Edit / Delete) */
+.icon-btn {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 5px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.edit-icon-btn {
+  color: #2563eb;
+}
+
+.edit-icon-btn:hover {
+  background-color: #2563eb;
+  color: #fff;
+}
+
+.delete-icon-btn {
+  color: #dc2626;
+}
+
+.delete-icon-btn:hover {
+  background-color: #dc2626;
+  color: #fff;
+}
+
+.restore-icon-btn {
+  color: #16a34a;
+}
+
+.restore-icon-btn:hover {
+  background-color: #16a34a;
+  color: #fff;
+}
+
 @media (max-width: 600px) {
   body {
     padding: 16px;
@@ -207,116 +450,8 @@ td button {
     justify-content: flex-end;
     gap: 8px;
   }
-}
-button {
-  background-color: #2563eb;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
 
-button:hover {
-  background-color: #1d4ed8;
-}
-
-button:active {
-  background-color: #1e40af;
-}
-
-/* Delete buttons stand out in red since the action is destructive */
-td button:last-of-type {
-  background-color: #dc2626;
-}
-
-td button:last-of-type:hover {
-  background-color: #b91c1c;
-}
-
-.stats-bar {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-  font-size: 14px;
-  color: #444;
-}
-
-.stats-bar span {
-  background: #f4f4f4;
-  padding: 6px 12px;
-  border-radius: 6px;
-}
-
-.filter-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.filter-btn {
-  background: #e5e7eb;
-  color: #333;
-}
-
-.filter-btn:hover {
-  background: #d5e0f5;
-}
-
-.filter-btn.active {
-  background: #15803d;
-  color: #fff;
-}
-
-.pagination-bar {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.pagination-bar button {
-  padding: 6px 12px;
-}
-
-.pagination-bar button:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-}
-
-.pagination-bar span {
-  font-size: 14px;
-  color: #555;
-}
-#toastBar {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  color: #fff;
-  z-index: 1000;
-  display: none;
-}
-
-#toastBar.show {
-  display: block;
-}
-
-#toastBar.error {
-  background: #dc2626;
-}
-
-#toastBar.success {
-  background: #16a34a;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  .board-view {
+    flex-direction: column;
+  }
 }
