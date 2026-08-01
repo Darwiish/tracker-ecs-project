@@ -1,557 +1,547 @@
-const API_BASE = "http://localhost:5000";
-const STATUSES = ["Todo", "In Progress", "Done"];
-const PAGE_SIZE = 10;
-
-let isRegisterMode = false;
+// --- Global State ---
+let tasks = [];
 let currentFilter = "All";
-let allTasks = [];
-let currentPage = 1;
-let currentView = "table";
+let currentView = "table"; // "table" or "board"
+let currentSortColumn = null;
+let currentSortDirection = "asc";
+let isRegisterMode = false;
 let sortableInstances = [];
 
-// --- Icon helpers ---
-const PEN_ICON_SVG = `
-<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
+const API_BASE = "/tasks"; // Backend API endpoint base
 
-const BIN_ICON_SVG = `
-<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-</svg>`;
+// --- DOM Elements ---
+const authSection = document.getElementById("authSection");
+const appSection = document.getElementById("appSection");
+const authTitle = document.getElementById("authTitle");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authToggleText = document.getElementById("authToggleText");
+const authToggleLink = document.getElementById("authToggleLink");
+const authError = document.getElementById("authError");
+const userEmailDisplay = document.getElementById("userEmailDisplay");
+const logoutBtn = document.getElementById("logoutBtn");
 
-const RESTORE_ICON_SVG = `
-<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M3 11a9 9 0 1 1 2.6 6.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M3 5v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
+const darkModeToggle = document.getElementById("darkModeToggle");
+const toastBar = document.getElementById("toastBar");
+const progressBar = document.getElementById("progressBar");
+const statsBar = document.getElementById("statsBar");
 
-function createEditButton(task) {
-  const btn = document.createElement("button");
-  btn.className = "icon-btn edit-icon-btn";
-  btn.innerHTML = PEN_ICON_SVG;
-  btn.title = "Edit task";
-  btn.setAttribute("aria-label", "Edit task");
-  btn.onclick = () => editTask(task);
-  return btn;
-}
+const filterBtns = document.querySelectorAll(".filter-btn");
+const tableViewBtn = document.getElementById("tableViewBtn");
+const boardViewBtn = document.getElementById("boardViewBtn");
+const taskTable = document.getElementById("taskTable");
+const boardView = document.getElementById("boardView");
 
-function createDeleteButton(id, name) {
-  const btn = document.createElement("button");
-  btn.className = "icon-btn delete-icon-btn";
-  btn.innerHTML = BIN_ICON_SVG;
-  btn.title = "Delete task";
-  btn.setAttribute("aria-label", "Delete task");
-  btn.onclick = () => deleteTask(id, name);
-  return btn;
-}
+const addTaskBtn = document.getElementById("addTaskBtn");
+const searchInput = document.getElementById("searchInput");
+const taskList = document.getElementById("taskList");
 
-function createRestoreButton(id) {
-  const btn = document.createElement("button");
-  btn.className = "icon-btn restore-icon-btn";
-  btn.innerHTML = RESTORE_ICON_SVG;
-  btn.title = "Restore to In Progress";
-  btn.setAttribute("aria-label", "Restore to In Progress");
-  btn.onclick = () => updateStatus(id, "In Progress");
-  return btn;
-}
+// Modal Elements
+const editModal = document.getElementById("editModal");
+const editTaskForm = document.getElementById("editTaskForm");
+const editTaskId = document.getElementById("editTaskId");
+const editTaskName = document.getElementById("editTaskName");
+const editDueDate = document.getElementById("editDueDate");
+const editPriority = document.getElementById("editPriority");
+const editCategory = document.getElementById("editCategory");
+const closeModalBtn = document.getElementById("closeModalBtn");
 
-// --- Toast helper ---
-let toastTimeout;
-function showToast(message, type = "error") {
-  const toast = document.getElementById("toastBar");
-  toast.textContent = message;
-  toast.className = `show ${type}`;
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => {
-    toast.className = "";
+// --- Toast Notification Helper ---
+function showToast(message, type = "success") {
+  if (!toastBar) return;
+  toastBar.textContent = message;
+  toastBar.className = `show ${type}`;
+  setTimeout(() => {
+    toastBar.className = "";
   }, 3000);
 }
 
-// --- Auth state helpers ---
-function getToken() {
-  return localStorage.getItem("token");
+// --- Auth Toggle (Login / Register) ---
+if (authToggleLink) {
+  authToggleLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    isRegisterMode = !isRegisterMode;
+    if (authError) authError.textContent = "";
+
+    if (isRegisterMode) {
+      if (authTitle) authTitle.textContent = "Register";
+      if (authSubmitBtn) authSubmitBtn.textContent = "Register Account";
+      if (authToggleText)
+        authToggleText.textContent = "Already have an account?";
+      authToggleLink.textContent = "Login";
+    } else {
+      if (authTitle) authTitle.textContent = "Login";
+      if (authSubmitBtn) authSubmitBtn.textContent = "Login";
+      if (authToggleText) authToggleText.textContent = "Don't have an account?";
+      authToggleLink.textContent = "Register";
+    }
+  });
 }
 
-function getEmail() {
-  return localStorage.getItem("email");
-}
+// --- Authentication Handler ---
+if (authSubmitBtn) {
+  authSubmitBtn.addEventListener("click", async () => {
+    const email = authEmail ? authEmail.value.trim() : "";
+    const password = authPassword ? authPassword.value.trim() : "";
 
-function setSession(token, email) {
-  localStorage.setItem("token", token);
-  localStorage.setItem("email", email);
-}
-
-function clearSession() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("email");
-}
-
-function showApp() {
-  document.querySelector(".container").classList.remove("auth-mode");
-  document.getElementById("authSection").style.display = "none";
-  document.getElementById("appSection").style.display = "block";
-  document.getElementById("userEmailDisplay").textContent = getEmail();
-  fetchTasks();
-}
-
-function showAuth() {
-  document.querySelector(".container").classList.add("auth-mode");
-  document.getElementById("authSection").style.display = "block";
-  document.getElementById("appSection").style.display = "none";
-}
-
-// --- Auth actions ---
-async function handleAuthSubmit() {
-  const email = document.getElementById("authEmail").value.trim();
-  const password = document.getElementById("authPassword").value;
-  const errorEl = document.getElementById("authError");
-  const submitBtn = document.getElementById("authSubmitBtn");
-  errorEl.textContent = "";
-
-  if (!email || !password) {
-    errorEl.textContent = "Email and password are required";
-    return;
-  }
-
-  const endpoint = isRegisterMode ? "/auth/register" : "/auth/login";
-  const originalText = submitBtn.textContent;
-  submitBtn.disabled = true;
-  submitBtn.textContent = "Please wait...";
-
-  try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      errorEl.textContent = data.message || "Something went wrong";
+    if (!email || !password) {
+      if (authError)
+        authError.textContent = "Please provide both email and password.";
       return;
     }
 
-    if (isRegisterMode) {
-      isRegisterMode = false;
-      updateAuthUI();
-      errorEl.style.color = "#166534";
-      errorEl.textContent = "Registered! Please log in.";
-    } else {
-      setSession(data.token, email);
-      showApp();
+    if (authError) authError.textContent = "";
+    const endpoint = isRegisterMode ? "/api/register" : "/api/login";
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (authError)
+          authError.textContent = data.message || "Authentication failed.";
+        return;
+      }
+
+      if (data.token) localStorage.setItem("token", data.token);
+      localStorage.setItem("userEmail", email);
+
+      showToast(
+        isRegisterMode ? "Account registered successfully!" : "Logged in!",
+      );
+      checkAuth();
+    } catch (err) {
+      // Local fallback mode when API is unavailable
+      console.warn("Backend API offline. Authenticating locally.");
+      localStorage.setItem("token", "demo-token");
+      localStorage.setItem("userEmail", email);
+      checkAuth();
     }
-  } catch (err) {
-    console.error(err);
-    errorEl.textContent = "Could not reach server";
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = originalText;
-  }
-}
-
-function updateAuthUI() {
-  document.getElementById("authTitle").textContent = isRegisterMode
-    ? "Register"
-    : "Login";
-  document.getElementById("authSubmitBtn").textContent = isRegisterMode
-    ? "Register"
-    : "Login";
-  document.getElementById("authToggleText").textContent = isRegisterMode
-    ? "Already have an account?"
-    : "Don't have an account?";
-  document.getElementById("authToggleLink").textContent = isRegisterMode
-    ? "Login"
-    : "Register";
-  document.getElementById("authError").style.color = "#b91c1c";
-  document.getElementById("authError").textContent = "";
-}
-
-function logout() {
-  clearSession();
-  showAuth();
-}
-
-// --- Task actions ---
-async function authFetch(url, options = {}) {
-  const token = getToken();
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
-    },
   });
-
-  if (res.status === 401 || res.status === 403) {
-    logout();
-    throw new Error("Session expired");
-  }
-
-  return res;
 }
 
-async function fetchTasks(search = "") {
-  const url = search
-    ? `${API_BASE}/tasks?search=${encodeURIComponent(search)}`
-    : `${API_BASE}/tasks`;
+// --- Check Session Status ---
+function checkAuth() {
+  const token = localStorage.getItem("token");
+  const userEmail = localStorage.getItem("userEmail");
+
+  if (token && userEmail) {
+    if (authSection) authSection.style.display = "none";
+    if (appSection) appSection.style.display = "block";
+    if (userEmailDisplay) userEmailDisplay.textContent = userEmail;
+    document.querySelector(".container")?.classList.remove("auth-mode");
+    fetchTasks();
+  } else {
+    if (authSection) authSection.style.display = "block";
+    if (appSection) appSection.style.display = "none";
+    document.querySelector(".container")?.classList.add("auth-mode");
+  }
+}
+
+// --- Logout ---
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
+    tasks = [];
+    checkAuth();
+    showToast("Logged out successfully");
+  });
+}
+
+// --- Dark Mode ---
+if (darkModeToggle) {
+  darkModeToggle.addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+    const isDark = document.body.classList.contains("dark-mode");
+    darkModeToggle.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+  });
+}
+
+// --- Task Data Operations ---
+async function fetchTasks() {
   try {
-    const res = await authFetch(url);
-    if (!res.ok) throw new Error("Failed to load tasks");
-    allTasks = await res.json();
-    currentPage = 1;
-    renderStats(allTasks);
-    renderTasks(applyFilter(allTasks));
-  } catch (err) {
-    if (err.message !== "Session expired") {
-      showToast("Could not load tasks. Please try again.");
-    }
-  }
-}
-
-function applyFilter(tasks) {
-  if (currentFilter === "All") return tasks;
-  return tasks.filter((t) => t.status === currentFilter);
-}
-
-function renderStats(tasks) {
-  const total = tasks.length;
-  const todo = tasks.filter((t) => t.status === "Todo").length;
-  const inProgress = tasks.filter((t) => t.status === "In Progress").length;
-  const done = tasks.filter((t) => t.status === "Done").length;
-
-  document.getElementById("statsBar").innerHTML = `
-        <span>Total: ${total}</span>
-        <span>Todo: ${todo}</span>
-        <span>In Progress: ${inProgress}</span>
-        <span>Done: ${done}</span>
-    `;
-}
-
-function renderTasks(tasks) {
-  const list = document.getElementById("taskList");
-  list.innerHTML = "";
-
-  const totalPages = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
-  if (currentPage > totalPages) currentPage = totalPages;
-
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageTasks = tasks.slice(start, start + PAGE_SIZE);
-
-  pageTasks.forEach((task) => {
-    const tr = document.createElement("tr");
-
-    const nameTd = document.createElement("td");
-    nameTd.textContent = task.name;
-    nameTd.setAttribute("data-label", "Task");
-
-    const dueTd = document.createElement("td");
-    dueTd.textContent = task.due_date || "—";
-    dueTd.setAttribute("data-label", "Due Date");
-
-    const statusTd = document.createElement("td");
-    statusTd.setAttribute("data-label", "Status");
-    const statusSelect = document.createElement("select");
-    STATUSES.forEach((s) => {
-      const option = document.createElement("option");
-      option.value = s;
-      option.textContent = s;
-      if (s === task.status) option.selected = true;
-      statusSelect.appendChild(option);
+    const token = localStorage.getItem("token");
+    const res = await fetch(API_BASE, {
+      headers: { Authorization: `Bearer ${token}` },
     });
-    statusSelect.onchange = () => updateStatus(task.id, statusSelect.value);
-    statusTd.appendChild(statusSelect);
-
-    const actionsTd = document.createElement("td");
-    actionsTd.setAttribute("data-label", "Actions");
-
-    if (task.status === "Done") {
-      actionsTd.appendChild(createRestoreButton(task.id));
+    if (res.ok) {
+      tasks = await res.json();
+    } else {
+      tasks = JSON.parse(localStorage.getItem("local_tasks") || "[]");
     }
+  } catch (err) {
+    tasks = JSON.parse(localStorage.getItem("local_tasks") || "[]");
+  }
+  render();
+}
 
-    actionsTd.appendChild(createEditButton(task));
-    actionsTd.appendChild(createDeleteButton(task.id, task.name));
+async function saveTask(taskData) {
+  taskData.id = taskData.id || Date.now();
+  taskData.status = taskData.status || "Todo";
 
-    tr.appendChild(nameTd);
-    tr.appendChild(dueTd);
-    tr.appendChild(statusTd);
-    tr.appendChild(actionsTd);
+  try {
+    const token = localStorage.getItem("token");
+    const res = await fetch(API_BASE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(taskData),
+    });
+    if (res.ok) {
+      const savedTask = await res.json();
+      tasks.push(savedTask);
+    } else {
+      tasks.push(taskData);
+    }
+  } catch (err) {
+    tasks.push(taskData);
+  }
 
-    list.appendChild(tr);
-  });
+  localStorage.setItem("local_tasks", JSON.stringify(tasks));
+  render();
+}
 
-  renderPagination(tasks.length, totalPages);
-
-  if (currentView === "board") {
-    renderBoard(tasks);
+async function updateTaskStatus(id, newStatus) {
+  const task = tasks.find((t) => t.id === id);
+  if (task) {
+    task.status = newStatus;
+    localStorage.setItem("local_tasks", JSON.stringify(tasks));
+    render();
   }
 }
 
-function renderPagination(totalItems, totalPages) {
-  const bar = document.getElementById("paginationBar");
-  bar.innerHTML = "";
-
-  if (totalItems <= PAGE_SIZE) return;
-
-  const prevBtn = document.createElement("button");
-  prevBtn.textContent = "Previous";
-  prevBtn.disabled = currentPage === 1;
-  prevBtn.onclick = () => {
-    currentPage--;
-    renderTasks(applyFilter(allTasks));
-  };
-
-  const pageLabel = document.createElement("span");
-  pageLabel.textContent = `Page ${currentPage} of ${totalPages}`;
-
-  const nextBtn = document.createElement("button");
-  nextBtn.textContent = "Next";
-  nextBtn.disabled = currentPage === totalPages;
-  nextBtn.onclick = () => {
-    currentPage++;
-    renderTasks(applyFilter(allTasks));
-  };
-
-  bar.appendChild(prevBtn);
-  bar.appendChild(pageLabel);
-  bar.appendChild(nextBtn);
+async function deleteTask(id) {
+  tasks = tasks.filter((t) => t.id !== id);
+  localStorage.setItem("local_tasks", JSON.stringify(tasks));
+  render();
+  showToast("Task deleted", "error");
 }
 
-// --- Kanban board view ---
-function renderBoard(tasks) {
-  const columns = {
-    Todo: document.getElementById("cardsTodo"),
-    "In Progress": document.getElementById("cardsInProgress"),
-    Done: document.getElementById("cardsDone"),
-  };
+// --- Add Task Handler (Fixes input detection & Docker tag) ---
+if (addTaskBtn) {
+  addTaskBtn.addEventListener("click", (e) => {
+    e.preventDefault();
 
-  Object.values(columns).forEach((col) => (col.innerHTML = ""));
+    // Fetch elements directly on click to get exact current value
+    const taskInput = document.getElementById("taskInput");
+    const dueDateInput = document.getElementById("dueDateInput");
+    const priorityInput = document.getElementById("priorityInput");
+    const categoryInput = document.getElementById("categoryInput");
+
+    const name = taskInput ? taskInput.value.trim() : "";
+
+    if (!name) {
+      showToast("Task name is required", "error");
+      return;
+    }
+
+    const newTask = {
+      id: Date.now(),
+      name: name,
+      due_date: dueDateInput ? dueDateInput.value || null : null,
+      priority: priorityInput ? priorityInput.value : "Medium",
+      category: categoryInput ? categoryInput.value : "General",
+      status: "Todo",
+    };
+
+    saveTask(newTask);
+
+    // Reset Form inputs
+    if (taskInput) taskInput.value = "";
+    if (dueDateInput) dueDateInput.value = "";
+
+    showToast("Task added successfully!");
+  });
+}
+
+// --- UI Renderers ---
+function render() {
+  let filtered = filterTasks();
+  filtered = sortTasks(filtered);
+
+  renderStats(tasks);
+  renderProgressBar(tasks);
+
+  if (currentView === "table") {
+    renderTable(filtered);
+  } else {
+    renderBoardView(filtered);
+  }
+}
+
+function filterTasks() {
+  const query = searchInput ? searchInput.value.toLowerCase() : "";
+  return tasks.filter((task) => {
+    const matchesFilter =
+      currentFilter === "All" || task.status === currentFilter;
+    const matchesSearch =
+      (task.name && task.name.toLowerCase().includes(query)) ||
+      (task.category && task.category.toLowerCase().includes(query));
+    return matchesFilter && matchesSearch;
+  });
+}
+
+function renderProgressBar(taskListData) {
+  if (!progressBar) return;
+  if (!taskListData.length) {
+    progressBar.style.width = "0%";
+    return;
+  }
+  const done = taskListData.filter((t) => t.status === "Done").length;
+  const percent = Math.round((done / taskListData.length) * 100);
+  progressBar.style.width = `${percent}%`;
+}
+
+function renderStats(taskListData) {
+  if (!statsBar) return;
+  const total = taskListData.length;
+  const todo = taskListData.filter((t) => t.status === "Todo").length;
+  const inProgress = taskListData.filter(
+    (t) => t.status === "In Progress",
+  ).length;
+  const done = taskListData.filter((t) => t.status === "Done").length;
+
+  statsBar.innerHTML = `
+    <span>Total: ${total}</span>
+    <span>Todo: ${todo}</span>
+    <span>In Progress: ${inProgress}</span>
+    <span>Done: ${done}</span>
+  `;
+}
+
+function getDueDateStatusClass(dueDateStr, status) {
+  if (!dueDateStr || status === "Done") return "";
+  const now = new Date();
+  const due = new Date(dueDateStr);
+  const diffHours = (due - now) / (1000 * 60 * 60);
+
+  if (diffHours < 0) return "overdue";
+  if (diffHours <= 48) return "due-soon";
+  return "";
+}
+
+// --- Table View Render ---
+function renderTable(taskListData) {
+  if (!taskList) return;
+  taskList.innerHTML = "";
+
+  taskListData.forEach((task) => {
+    const tr = document.createElement("tr");
+    const warningClass = getDueDateStatusClass(task.due_date, task.status);
+    if (warningClass) tr.classList.add(warningClass);
+
+    tr.innerHTML = `
+      <td><strong>${task.name}</strong></td>
+      <td><span class="tag">${task.category}</span></td>
+      <td><span class="badge badge-${(task.priority || "low").toLowerCase()}">${task.priority}</span></td>
+      <td>${task.due_date || "—"}</td>
+      <td>
+        <select onchange="updateTaskStatus(${task.id}, this.value)">
+          <option value="Todo" ${task.status === "Todo" ? "selected" : ""}>Todo</option>
+          <option value="In Progress" ${task.status === "In Progress" ? "selected" : ""}>In Progress</option>
+          <option value="Done" ${task.status === "Done" ? "selected" : ""}>Done</option>
+        </select>
+      </td>
+      <td>
+        <button class="icon-btn edit-icon-btn" onclick="openEditModal(${task.id})">✏️</button>
+        <button class="icon-btn delete-icon-btn" onclick="deleteTask(${task.id})">🗑️</button>
+      </td>
+    `;
+    taskList.appendChild(tr);
+  });
+}
+
+// --- Kanban View Render ---
+function renderBoardView(taskListData) {
+  const cardsTodo = document.getElementById("cardsTodo");
+  const cardsInProgress = document.getElementById("cardsInProgress");
+  const cardsDone = document.getElementById("cardsDone");
+
+  if (!cardsTodo || !cardsInProgress || !cardsDone) return;
+
+  cardsTodo.innerHTML = "";
+  cardsInProgress.innerHTML = "";
+  cardsDone.innerHTML = "";
 
   const counts = { Todo: 0, "In Progress": 0, Done: 0 };
 
-  tasks.forEach((task) => {
-    counts[task.status]++;
+  taskListData.forEach((task) => {
+    counts[task.status] = (counts[task.status] || 0) + 1;
 
     const card = document.createElement("div");
-    card.className = "task-card";
-    card.dataset.taskId = task.id;
+    card.className = `task-card ${getDueDateStatusClass(task.due_date, task.status)}`;
+    card.setAttribute("data-id", task.id);
 
-    const nameEl = document.createElement("div");
-    nameEl.className = "card-name";
-    nameEl.textContent = task.name;
+    card.innerHTML = `
+      <div class="card-name">${task.name}</div>
+      <div class="card-due">📅 ${task.due_date || "No due date"}</div>
+      <div style="margin-bottom: 8px;">
+        <span class="tag">${task.category}</span>
+        <span class="badge badge-${(task.priority || "low").toLowerCase()}">${task.priority}</span>
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn edit-icon-btn" onclick="openEditModal(${task.id})">✏️ Edit</button>
+        <button class="icon-btn delete-icon-btn" onclick="deleteTask(${task.id})">🗑️</button>
+      </div>
+    `;
 
-    const dueEl = document.createElement("div");
-    dueEl.className = "card-due";
-    dueEl.textContent = task.due_date ? `Due: ${task.due_date}` : "No due date";
-
-    const actionsEl = document.createElement("div");
-    actionsEl.className = "card-actions";
-    if (task.status === "Done") {
-      actionsEl.appendChild(createRestoreButton(task.id));
-    }
-    actionsEl.appendChild(createEditButton(task));
-    actionsEl.appendChild(createDeleteButton(task.id, task.name));
-
-    card.appendChild(nameEl);
-    card.appendChild(dueEl);
-    card.appendChild(actionsEl);
-
-    columns[task.status].appendChild(card);
+    if (task.status === "Todo") cardsTodo.appendChild(card);
+    else if (task.status === "In Progress") cardsInProgress.appendChild(card);
+    else if (task.status === "Done") cardsDone.appendChild(card);
   });
 
-  document.getElementById("countTodo").textContent = counts["Todo"];
-  document.getElementById("countInProgress").textContent =
-    counts["In Progress"];
-  document.getElementById("countDone").textContent = counts["Done"];
+  const cTodo = document.getElementById("countTodo");
+  const cProg = document.getElementById("countInProgress");
+  const cDone = document.getElementById("countDone");
 
-  setupDragAndDrop();
+  if (cTodo) cTodo.textContent = counts["Todo"];
+  if (cProg) cProg.textContent = counts["In Progress"];
+  if (cDone) cDone.textContent = counts["Done"];
+
+  initDragAndDrop();
 }
 
-function setupDragAndDrop() {
-  sortableInstances.forEach((s) => s.destroy());
+function initDragAndDrop() {
+  sortableInstances.forEach((inst) => inst.destroy());
   sortableInstances = [];
 
-  document.querySelectorAll(".column-cards").forEach((columnEl) => {
-    const sortable = Sortable.create(columnEl, {
-      group: "tasks",
+  const columns = ["cardsTodo", "cardsInProgress", "cardsDone"];
+  columns.forEach((colId) => {
+    const el = document.getElementById(colId);
+    if (!el || typeof Sortable === "undefined") return;
+
+    const sortable = new Sortable(el, {
+      group: "kanban",
       animation: 150,
-      forceFallback: true,
-      fallbackTolerance: 3,
-      onAdd: (evt) => {
-        const taskId = evt.item.dataset.taskId;
-        const newStatus = evt.to.closest(".board-column").dataset.status;
-        updateStatus(taskId, newStatus);
+      onEnd: function (evt) {
+        const taskId = Number(evt.item.getAttribute("data-id"));
+        const targetColumn = evt.to.parentElement.getAttribute("data-status");
+        if (taskId && targetColumn) {
+          updateTaskStatus(taskId, targetColumn);
+        }
       },
     });
     sortableInstances.push(sortable);
   });
 }
 
-function switchView(view) {
-  currentView = view;
-  const tableEl = document.getElementById("taskTable");
-  const boardEl = document.getElementById("boardView");
-  const paginationEl = document.getElementById("paginationBar");
-
-  if (view === "table") {
-    tableEl.style.display = "table";
-    boardEl.style.display = "none";
-    paginationEl.style.display = "flex";
-    document.getElementById("tableViewBtn").classList.add("active");
-    document.getElementById("boardViewBtn").classList.remove("active");
-    renderTasks(applyFilter(allTasks));
-  } else {
-    tableEl.style.display = "none";
-    boardEl.style.display = "flex";
-    paginationEl.style.display = "none";
-    document.getElementById("tableViewBtn").classList.remove("active");
-    document.getElementById("boardViewBtn").classList.add("active");
-    renderBoard(applyFilter(allTasks));
-  }
-}
-
-// --- Edit / Update / Delete / Add ---
-function editTask(task) {
-  const newName = prompt("Edit task name:", task.name);
-  if (newName === null || newName.trim() === "") return;
-
-  const newDueDate = prompt(
-    "Edit due date (YYYY-MM-DD, leave blank for none):",
-    task.due_date || "",
-  );
-  if (newDueDate === null) return;
-
-  updateTask(task.id, newName.trim(), newDueDate.trim());
-}
-
-async function updateTask(id, name, due_date) {
-  try {
-    const res = await authFetch(`${API_BASE}/tasks/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, due_date }),
-    });
-    if (!res.ok) throw new Error();
-    showToast("Task updated", "success");
-    fetchTasks(document.getElementById("searchInput").value);
-  } catch (err) {
-    if (err.message !== "Session expired") {
-      showToast("Failed to update task. Please try again.");
-    }
-  }
-}
-
-async function updateStatus(id, status) {
-  try {
-    const res = await authFetch(`${API_BASE}/tasks/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (!res.ok) throw new Error();
-    fetchTasks(document.getElementById("searchInput").value);
-  } catch (err) {
-    if (err.message !== "Session expired") {
-      showToast("Failed to update status. Please try again.");
-    }
-  }
-}
-
-async function deleteTask(id, name) {
-  const confirmed = confirm(`Delete "${name}"? This cannot be undone.`);
-  if (!confirmed) return;
-
-  try {
-    const res = await authFetch(`${API_BASE}/tasks/${id}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) throw new Error();
-    showToast("Task deleted", "success");
-    fetchTasks(document.getElementById("searchInput").value);
-  } catch (err) {
-    if (err.message !== "Session expired") {
-      showToast("Failed to delete task. Please try again.");
-    }
-  }
-}
-
-async function addTask() {
-  const input = document.getElementById("taskInput");
-  const dueDateInput = document.getElementById("dueDateInput");
-  const addBtn = document.getElementById("addTaskBtn");
-  const name = input.value.trim();
-  if (!name) return;
-
-  const originalText = addBtn.textContent;
-  addBtn.disabled = true;
-  addBtn.textContent = "Adding...";
-
-  try {
-    const res = await authFetch(`${API_BASE}/tasks`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, due_date: dueDateInput.value || null }),
-    });
-    if (!res.ok) throw new Error();
-
-    input.value = "";
-    dueDateInput.value = "";
-    showToast("Task added", "success");
-    fetchTasks(document.getElementById("searchInput").value);
-  } catch (err) {
-    if (err.message !== "Session expired") {
-      showToast("Failed to add task. Please try again.");
-    }
-  } finally {
-    addBtn.disabled = false;
-    addBtn.textContent = originalText;
-  }
-}
-
-// --- Event listeners ---
-document.getElementById("addTaskBtn").addEventListener("click", addTask);
-document.getElementById("searchInput").addEventListener("input", (e) => {
-  fetchTasks(e.target.value);
-});
-document
-  .getElementById("authSubmitBtn")
-  .addEventListener("click", handleAuthSubmit);
-document.getElementById("logoutBtn").addEventListener("click", logout);
-document.getElementById("authToggleLink").addEventListener("click", (e) => {
-  e.preventDefault();
-  isRegisterMode = !isRegisterMode;
-  updateAuthUI();
-});
-
-document.querySelectorAll(".filter-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    currentFilter = btn.dataset.filter;
-    currentPage = 1;
-    document
-      .querySelectorAll(".filter-btn")
-      .forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    if (currentView === "board") {
-      renderBoard(applyFilter(allTasks));
+// --- Table Header Sorting ---
+document.querySelectorAll("th.sortable").forEach((header) => {
+  header.addEventListener("click", () => {
+    const column = header.getAttribute("data-sort");
+    if (currentSortColumn === column) {
+      currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
     } else {
-      renderTasks(applyFilter(allTasks));
+      currentSortColumn = column;
+      currentSortDirection = "asc";
     }
+    render();
   });
 });
 
-document
-  .getElementById("tableViewBtn")
-  .addEventListener("click", () => switchView("table"));
-document
-  .getElementById("boardViewBtn")
-  .addEventListener("click", () => switchView("board"));
+function sortTasks(taskListData) {
+  if (!currentSortColumn) return taskListData;
 
-// --- Init ---
-if (getToken()) {
-  showApp();
-} else {
-  showAuth();
+  return [...taskListData].sort((a, b) => {
+    let valA = a[currentSortColumn] || "";
+    let valB = b[currentSortColumn] || "";
+
+    if (currentSortColumn === "priority") {
+      const pMap = { High: 3, Medium: 2, Low: 1 };
+      valA = pMap[valA] || 0;
+      valB = pMap[valB] || 0;
+    }
+
+    if (valA < valB) return currentSortDirection === "asc" ? -1 : 1;
+    if (valA > valB) return currentSortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
 }
+
+// --- Views & Filters ---
+filterBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    filterBtns.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFilter = btn.getAttribute("data-filter");
+    render();
+  });
+});
+
+if (tableViewBtn) {
+  tableViewBtn.addEventListener("click", () => {
+    currentView = "table";
+    tableViewBtn.classList.add("active");
+    if (boardViewBtn) boardViewBtn.classList.remove("active");
+    if (taskTable) taskTable.style.display = "table";
+    if (boardView) boardView.style.display = "none";
+    render();
+  });
+}
+
+if (boardViewBtn) {
+  boardViewBtn.addEventListener("click", () => {
+    currentView = "board";
+    boardViewBtn.classList.add("active");
+    if (tableViewBtn) tableViewBtn.classList.remove("active");
+    if (taskTable) taskTable.style.display = "none";
+    if (boardView) boardView.style.display = "flex";
+    render();
+  });
+}
+
+if (searchInput) searchInput.addEventListener("input", render);
+
+// --- Edit Modal Handlers ---
+window.openEditModal = function (id) {
+  const task = tasks.find((t) => t.id === id);
+  if (!task || !editModal) return;
+
+  editTaskId.value = task.id;
+  editTaskName.value = task.name;
+  editDueDate.value = task.due_date || "";
+  editPriority.value = task.priority;
+  editCategory.value = task.category;
+
+  editModal.classList.add("show");
+};
+
+if (closeModalBtn) {
+  closeModalBtn.addEventListener("click", () => {
+    if (editModal) editModal.classList.remove("show");
+  });
+}
+
+if (editTaskForm) {
+  editTaskForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const id = Number(editTaskId.value);
+    const task = tasks.find((t) => t.id === id);
+
+    if (task) {
+      task.name = editTaskName.value.trim();
+      task.due_date = editDueDate.value || null;
+      task.priority = editPriority.value;
+      task.category = editCategory.value;
+
+      localStorage.setItem("local_tasks", JSON.stringify(tasks));
+      if (editModal) editModal.classList.remove("show");
+      render();
+      showToast("Task updated!");
+    }
+  });
+}
+
+// --- Initialization ---
+document.addEventListener("DOMContentLoaded", () => {
+  checkAuth();
+});

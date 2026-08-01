@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DevOps Project Tracker</title>
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -21,34 +22,7 @@
             stroke-linejoin="round"
           >
             <path
-              d="M200 40
-                    c14 0 28 2 41 6
-                    l4 28 c10 4 19 9 27 15
-                    l26 -12
-                    c20 16 36 36 47 59
-                    l-18 22
-                    c3 10 5 20 5 30
-                    s-2 20 -5 30
-                    l18 22
-                    c-11 23 -27 43 -47 59
-                    l-26 -12
-                    c-8 6 -17 11 -27 15
-                    l-4 28
-                    c-13 4 -27 6 -41 6
-                    s-28 -2 -41 -6
-                    l-4 -28
-                    c-10 -4 -19 -9 -27 -15
-                    l-26 12
-                    c-20 -16 -36 -36 -47 -59
-                    l18 -22
-                    c-3 -10 -5 -20 -5 -30
-                    s2 -20 5 -30
-                    l-18 -22
-                    c11 -23 27 -43 47 -59
-                    l26 12
-                    c8 -6 17 -11 27 -15
-                    l4 -28
-                    c13 -4 27 -6 41 -6z"
+              d="M200 40 c14 0 28 2 41 6 l4 28 c10 4 19 9 27 15 l26 -12 c20 16 36 36 47 59 l-18 22 c3 10 5 20 5 30 s-2 20 -5 30 l18 22 c-11 23 -27 43 -47 59 l-26 -12 c-8 6 -17 11 -27 15 l-4 28 c-13 4 -27 6 -41 6 s-28 -2 -41 -6 l-4 -28 c-10 -4 -19 -9 -27 -15 l-26 12 c-20 -16 -36 -36 -47 -59 l18 -22 c-3 -10 -5 -20 -5 -30 s2 -20 5 -30 l-18 -22 c11 -23 27 -43 47 -59 l26 12 c8 -6 17 -11 27 -15 l4 -28 c13 -4 27 -6 41 -6z"
             />
             <circle cx="200" cy="188" r="78" />
           </g>
@@ -67,7 +41,7 @@
         <h1>DevOps Project Tracker</h1>
       </div>
 
-      <!-- Auth section: shown when logged out -->
+      <!-- Auth section: Login & Registration -->
       <div id="authSection">
         <h2 id="authTitle">Login</h2>
         <input type="email" id="authEmail" placeholder="Email" />
@@ -80,7 +54,7 @@
         <p id="authError" class="error"></p>
       </div>
 
-      <!-- App section: shown when logged in -->
+      <!-- Main application dashboard -->
       <div id="appSection" style="display: none">
         <div class="user-bar">
           <div class="user-info">
@@ -91,17 +65,32 @@
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
-              <circle cx="12" cy="8" r="4" stroke="#555" stroke-width="2" />
+              <circle
+                cx="12"
+                cy="8"
+                r="4"
+                stroke="currentColor"
+                stroke-width="2"
+              />
               <path
                 d="M4 20c0-4 4-6 8-6s8 2 8 6"
-                stroke="#555"
+                stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
               />
             </svg>
             <span id="userEmailDisplay"></span>
           </div>
-          <button id="logoutBtn">Logout</button>
+          <!-- Dark mode toggle and logout controls -->
+          <div class="user-actions">
+            <button id="darkModeToggle" class="theme-btn">🌙 Dark Mode</button>
+            <button id="logoutBtn">Logout</button>
+          </div>
+        </div>
+
+        <!-- Completion progress indicator -->
+        <div class="progress-container">
+          <div id="progressBar" class="progress-bar"></div>
         </div>
 
         <div id="statsBar" class="stats-bar"></div>
@@ -120,26 +109,60 @@
           <button id="boardViewBtn" class="view-btn">Board View</button>
         </div>
 
+        <!-- New Task Creation Form -->
         <div class="add-task">
           <input type="text" id="taskInput" placeholder="Task Name" />
           <input type="date" id="dueDateInput" />
+
+          <select id="priorityInput">
+            <option value="Low">Low Priority</option>
+            <option value="Medium" selected>Medium Priority</option>
+            <option value="High">High Priority</option>
+          </select>
+
+          <select id="categoryInput">
+            <option value="General">General</option>
+            <option value="Backend">Backend</option>
+            <option value="Frontend">Frontend</option>
+            <option value="AWS">AWS</option>
+            <option value="CI/CD">CI/CD</option>
+            <option value="Docker">Docker</option>
+            <option value="Terraform">Terraform</option>
+            <option value="CI/CD">CI/CD</option>
+          </select>
+
           <button id="addTaskBtn">Add Task</button>
         </div>
 
         <h2>Current Tasks</h2>
         <input type="text" id="searchInput" placeholder="Search tasks..." />
+
+        <!-- Interactive sortable task table -->
         <table id="taskTable">
           <thead>
             <tr>
-              <th>Task</th>
-              <th>Due Date</th>
-              <th>Status</th>
+              <th class="sortable" data-sort="name">
+                Task <span class="sort-icon">↕</span>
+              </th>
+              <th class="sortable" data-sort="category">
+                Category <span class="sort-icon">↕</span>
+              </th>
+              <th class="sortable" data-sort="priority">
+                Priority <span class="sort-icon">↕</span>
+              </th>
+              <th class="sortable" data-sort="due_date">
+                Due Date <span class="sort-icon">↕</span>
+              </th>
+              <th class="sortable" data-sort="status">
+                Status <span class="sort-icon">↕</span>
+              </th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="taskList"></tbody>
         </table>
 
+        <!-- Drag-and-drop Kanban Board View -->
         <div id="boardView" class="board-view" style="display: none">
           <div class="board-column" data-status="Todo">
             <h3>Todo <span class="column-count" id="countTodo">0</span></h3>
@@ -161,6 +184,47 @@
         <div id="paginationBar" class="pagination-bar"></div>
       </div>
     </div>
+
+    <!-- Edit Task Modal Overlay -->
+    <div id="editModal" class="modal">
+      <div class="modal-content">
+        <h3>Edit Task Details</h3>
+        <form id="editTaskForm">
+          <input type="hidden" id="editTaskId" />
+          <label for="editTaskName">Task Name</label>
+          <input type="text" id="editTaskName" required />
+
+          <label for="editDueDate">Due Date</label>
+          <input type="date" id="editDueDate" />
+
+          <label for="editPriority">Priority</label>
+          <select id="editPriority">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+
+          <label for="editCategory">Category</label>
+          <select id="editCategory">
+            <option value="General">General</option>
+            <option value="Backend">Backend</option>
+            <option value="Frontend">Frontend</option>
+            <option value="AWS">AWS</option>
+            <option value="Docker">Docker</option>
+            <option value="Terraform">Terraform</option>
+            <option value="CI/CD">CI/CD</option>
+          </select>
+
+          <div class="modal-actions">
+            <button type="button" id="closeModalBtn" class="secondary-btn">
+              Cancel
+            </button>
+            <button type="submit">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script src="app.js"></script>
   </body>
