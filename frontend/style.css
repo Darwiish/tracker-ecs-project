@@ -1,14 +1,41 @@
+/* Color Palette Variables for Light and Dark themes */
+:root {
+  --bg-body: #b5bcc9;
+  --bg-card: #ffffff;
+  --text-main: #333333;
+  --text-muted: #666666;
+  --border-color: #eee;
+  --kanban-col-bg: #b5bcc9;
+  --kanban-card-bg: #f0ead0;
+  --kanban-card-text: #3f3a2e;
+}
+
+body.dark-mode {
+  --bg-body: #1e1e2e;
+  --bg-card: #2a2a3c;
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --border-color: #374151;
+  --kanban-col-bg: #181825;
+  --kanban-card-bg: #313244;
+  --kanban-card-text: #cdd6f4;
+}
+
 body {
   font-family: Arial, sans-serif;
-  background: #b5bcc9;
+  background: var(--bg-body);
+  color: var(--text-main);
   margin: 0;
   padding: 40px;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .container {
   max-width: 1000px;
   margin: 0 auto;
-  background: #fff;
+  background: var(--bg-card);
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -37,7 +64,7 @@ body {
   font-size: 24px;
 }
 
-/* Auth section */
+/* Authentication Section Styles */
 #authSection {
   max-width: 320px;
   margin: 0 auto;
@@ -47,13 +74,19 @@ body {
   text-align: center;
 }
 
-#authSection input {
+#authSection input,
+.modal input,
+.modal select {
   display: block;
   width: 100%;
   box-sizing: border-box;
   padding: 8px;
   margin-bottom: 10px;
   font-size: 14px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
 }
 
 #authSection button {
@@ -78,10 +111,14 @@ body {
 
 .user-bar {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
+}
+
+.user-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .user-info {
@@ -89,34 +126,64 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #333;
 }
 
-.user-bar button {
-  padding: 6px 12px;
-  cursor: pointer;
+/* Theme Toggle Button */
+.theme-btn {
+  background-color: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.theme-btn:hover {
+  background-color: var(--border-color);
+}
+
+/* Visual Progress Bar */
+.progress-container {
+  width: 100%;
+  background-color: var(--border-color);
+  border-radius: 8px;
+  height: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background-color: #16a34a;
+  transition: width 0.3s ease;
 }
 
 .add-task {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .add-task input[type="text"] {
-  flex: 1;
+  flex: 2;
+  min-width: 180px;
   padding: 8px;
 }
 
-.add-task input[type="date"] {
+.add-task input,
+.add-task select {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.add-task input[type="date"],
+.add-task select {
   padding: 8px;
+  border-radius: 6px;
+  font-size: 14px;
 }
 
-.add-task button {
-  padding: 8px 14px;
-  cursor: pointer;
-}
-
+/* Table and Interactive Header Sorting */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -126,20 +193,28 @@ th,
 td {
   text-align: left;
   padding: 10px 8px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
 }
 
 th {
   font-size: 13px;
   text-transform: uppercase;
-  color: #666;
-  border-bottom: 2px solid #ddd;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
 }
 
-td button {
-  padding: 4px 10px;
-  margin-right: 6px;
+th.sortable {
   cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover {
+  color: #2563eb;
+}
+
+.sort-icon {
+  font-size: 11px;
+  margin-left: 4px;
 }
 
 button {
@@ -157,13 +232,12 @@ button:hover {
   background-color: #1d4ed8;
 }
 
-button:active {
-  background-color: #1e40af;
+button.secondary-btn {
+  background-color: #6b7280;
 }
 
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+button.secondary-btn:hover {
+  background-color: #4b5563;
 }
 
 .stats-bar {
@@ -171,11 +245,10 @@ button:disabled {
   gap: 16px;
   margin-bottom: 16px;
   font-size: 14px;
-  color: #444;
 }
 
 .stats-bar span {
-  background: #f4f4f4;
+  background: var(--border-color);
   padding: 6px 12px;
   border-radius: 6px;
 }
@@ -187,12 +260,8 @@ button:disabled {
 }
 
 .filter-btn {
-  background: #e5e7eb;
-  color: #333;
-}
-
-.filter-btn:hover {
-  background: #d5e0f5;
+  background: var(--border-color);
+  color: var(--text-main);
 }
 
 .filter-btn.active {
@@ -206,20 +275,6 @@ button:disabled {
   align-items: center;
   gap: 12px;
   margin-top: 16px;
-}
-
-.pagination-bar button {
-  padding: 6px 12px;
-}
-
-.pagination-bar button:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-}
-
-.pagination-bar span {
-  font-size: 14px;
-  color: #555;
 }
 
 #toastBar {
@@ -254,12 +309,8 @@ button:disabled {
 }
 
 .view-btn {
-  background: #e5e7eb;
-  color: #333;
-}
-
-.view-btn:hover {
-  background: #d1d5db;
+  background: var(--border-color);
+  color: var(--text-main);
 }
 
 .view-btn.active {
@@ -267,7 +318,40 @@ button:disabled {
   color: #fff;
 }
 
-/* Kanban board */
+/* Priority Badges & Domain Tags */
+.badge {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.badge-low {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.badge-medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+.badge-high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.tag {
+  background: var(--border-color);
+  color: var(--text-main);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  border: 1px solid var(--border-color);
+  font-weight: bold;
+}
+
+/* Kanban View Layout */
 .board-view {
   display: flex;
   gap: 16px;
@@ -276,17 +360,18 @@ button:disabled {
 
 .board-column {
   flex: 1;
-  background: #b5bcc9;
-  border: 1px solid #e5decb;
+  background: var(--kanban-col-bg);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 10px;
-  min-height: 200px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
 }
 
 .board-column h3 {
   font-size: 14px;
   text-transform: uppercase;
-  color: #6b6152;
   margin: 4px 0 10px 4px;
   display: flex;
   justify-content: space-between;
@@ -294,49 +379,49 @@ button:disabled {
 }
 
 .column-count {
-  background: #fdfbf3;
-  border: 1px solid #e5decb;
+  background: var(--bg-card);
   border-radius: 10px;
   padding: 2px 8px;
   font-size: 12px;
-  color: #6b6152;
 }
 
 .column-cards {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 60px;
-}
-
-.column-cards.drag-over {
-  background: rgba(180, 160, 100, 0.12);
-  border-radius: 6px;
+  flex-grow: 1;
+  min-height: 100px;
 }
 
 .task-card {
-  background: #f0ead0;
-  border: 1px solid #e5decb;
+  background: var(--kanban-card-bg);
+  color: var(--kanban-card-text);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 10px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   cursor: grab;
 }
 
-.task-card:active {
-  cursor: grabbing;
+/* Task Overdue & Warning Indicators */
+.task-card.overdue,
+tr.overdue {
+  border-left: 5px solid #dc2626 !important;
+}
+
+.task-card.due-soon,
+tr.due-soon {
+  border-left: 5px solid #f59e0b !important;
 }
 
 .task-card .card-name {
   font-weight: bold;
   font-size: 14px;
   margin-bottom: 4px;
-  color: #3f3a2e;
 }
 
 .task-card .card-due {
   font-size: 12px;
-  color: #36332c;
   margin-bottom: 8px;
 }
 
@@ -345,113 +430,66 @@ button:disabled {
   gap: 6px;
 }
 
-.task-card .card-actions button {
-  padding: 3px 8px;
-  font-size: 12px;
-}
-
-/* Icon buttons (Edit / Delete) */
+/* Action Icon Buttons */
 .icon-btn {
   background: none;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 5px 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
 }
 
 .edit-icon-btn {
   color: #2563eb;
 }
-
-.edit-icon-btn:hover {
-  background-color: #2563eb;
-  color: #fff;
-}
-
 .delete-icon-btn {
   color: #dc2626;
 }
-
-.delete-icon-btn:hover {
-  background-color: #dc2626;
-  color: #fff;
-}
-
 .restore-icon-btn {
   color: #16a34a;
 }
 
-.restore-icon-btn:hover {
-  background-color: #16a34a;
-  color: #fff;
+/* Edit Task Modal Dialog */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
 }
 
-@media (max-width: 600px) {
-  body {
-    padding: 16px;
-  }
+.modal.show {
+  display: flex;
+}
 
-  .container {
-    padding: 14px;
-  }
+.modal-content {
+  background: var(--bg-card);
+  color: var(--text-main);
+  padding: 24px;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
 
-  .app-header h1 {
-    font-size: 18px;
-  }
+.modal-content label {
+  display: block;
+  font-size: 12px;
+  font-weight: bold;
+  margin: 8px 0 4px;
+}
 
-  .add-task {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  table,
-  thead,
-  tbody,
-  th,
-  td,
-  tr {
-    display: block;
-  }
-
-  thead {
-    display: none;
-  }
-
-  tbody tr {
-    border: 1px solid #eee;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    padding: 8px;
-  }
-
-  td {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: none;
-    padding: 6px 4px;
-  }
-
-  td::before {
-    content: attr(data-label);
-    font-weight: bold;
-    font-size: 12px;
-    color: #666;
-    margin-right: 10px;
-  }
-
-  td[data-label="Actions"] {
-    justify-content: flex-end;
-    gap: 8px;
-  }
-
-  .board-view {
-    flex-direction: column;
-  }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
 }
