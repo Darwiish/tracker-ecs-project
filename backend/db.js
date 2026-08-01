@@ -1,6 +1,7 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
+// Configure connection pool via environment variables or default local config
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
