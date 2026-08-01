@@ -57,6 +57,15 @@ function showToast(message, type = "success") {
   }, 3000);
 }
 
+// --- Category Tag Helper ---
+function getCategoryTagClass(category) {
+  // Converts "CI/CD" -> "tag-cicd", "AWS" -> "tag-aws", "Terraform" -> "tag-terraform"
+  const cleanCategory = (category || "general")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ""); // Fixed regex range (0-9)
+  return `tag tag-${cleanCategory}`;
+}
+
 // --- Auth Toggle (Login / Register) ---
 if (authToggleLink) {
   authToggleLink.addEventListener("click", (e) => {
@@ -341,7 +350,7 @@ function renderTable(taskListData) {
 
     tr.innerHTML = `
       <td><strong>${task.name}</strong></td>
-      <td><span class="tag">${task.category}</span></td>
+      <td><span class="${getCategoryTagClass(task.category)}">${task.category}</span></td>
       <td><span class="badge badge-${(task.priority || "low").toLowerCase()}">${task.priority}</span></td>
       <td>${task.due_date || "—"}</td>
       <td>
@@ -382,12 +391,12 @@ function renderBoardView(taskListData) {
     card.setAttribute("data-id", task.id);
 
     card.innerHTML = `
-      <div class="card-name">${task.name}</div>
-      <div class="card-due">📅 ${task.due_date || "No due date"}</div>
-      <div style="margin-bottom: 8px;">
-        <span class="tag">${task.category}</span>
-        <span class="badge badge-${(task.priority || "low").toLowerCase()}">${task.priority}</span>
-      </div>
+    <div class="card-name">${task.name}</div>
+    <div class="card-due">📅 ${task.due_date || "No due date"}</div>
+    <div style="margin-bottom: 8px;">
+    <span class="${getCategoryTagClass(task.category)}">${task.category}</span>
+    <span class="badge badge-${(task.priority || "low").toLowerCase()}">${task.priority}</span>
+  </div>
       <div class="card-actions">
         <button class="icon-btn edit-icon-btn" onclick="openEditModal(${task.id})">✏️ Edit</button>
         <button class="icon-btn delete-icon-btn" onclick="deleteTask(${task.id})">🗑️</button>
