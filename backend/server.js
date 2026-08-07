@@ -10,11 +10,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/auth", authRoutes);
-app.use("/tasks", taskRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/tasks", taskRoutes);
 
 app.get("/", (req, res) => {
-  res.send("DevOps Project Tracker API is running 🚀");
+  res.json({
+    service: "tracker-backend",
+    message: "DevOps Project Tracker API is running",
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+  });
 });
 
 const PORT = process.env.PORT || 5000;
