@@ -515,16 +515,6 @@ tr.due-soon {
   cursor: pointer;
 }
 
-.edit-icon-btn {
-  color: #2563eb;
-}
-.delete-icon-btn {
-  color: #dc2626;
-}
-.restore-icon-btn {
-  color: #16a34a;
-}
-
 /* Edit Task Modal Dialog */
 .modal {
   display: none;
