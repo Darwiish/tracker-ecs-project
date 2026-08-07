@@ -1,283 +1,461 @@
-// --- Global State ---
+// ===============================
+// Global State
+// ===============================
+
 let tasks = [];
 let currentFilter = "All";
-let currentView = "table"; // "table" or "board"
+let currentView = "table";
 let currentSortColumn = null;
 let currentSortDirection = "asc";
 let isRegisterMode = false;
 let sortableInstances = [];
 
-const API_BASE = "/tasks"; // Backend API endpoint base
+const API_BASE = "/api/tasks";
 
-// --- DOM Elements ---
+// ===============================
+// DOM Elements
+// ===============================
+
 const authSection = document.getElementById("authSection");
 const appSection = document.getElementById("appSection");
+
 const authTitle = document.getElementById("authTitle");
 const authEmail = document.getElementById("authEmail");
 const authPassword = document.getElementById("authPassword");
 const authSubmitBtn = document.getElementById("authSubmitBtn");
+
 const authToggleText = document.getElementById("authToggleText");
 const authToggleLink = document.getElementById("authToggleLink");
 const authError = document.getElementById("authError");
+
 const userEmailDisplay = document.getElementById("userEmailDisplay");
 const logoutBtn = document.getElementById("logoutBtn");
 
-const darkModeToggle = document.getElementById("darkModeToggle");
 const toastBar = document.getElementById("toastBar");
+const darkModeToggle = document.getElementById("darkModeToggle");
+
 const progressBar = document.getElementById("progressBar");
 const statsBar = document.getElementById("statsBar");
 
 const filterBtns = document.querySelectorAll(".filter-btn");
+
 const tableViewBtn = document.getElementById("tableViewBtn");
 const boardViewBtn = document.getElementById("boardViewBtn");
+
 const taskTable = document.getElementById("taskTable");
 const boardView = document.getElementById("boardView");
 
-const addTaskBtn = document.getElementById("addTaskBtn");
-const searchInput = document.getElementById("searchInput");
 const taskList = document.getElementById("taskList");
 
-// Modal Elements
+const addTaskBtn = document.getElementById("addTaskBtn");
+const searchInput = document.getElementById("searchInput");
+
+// Modal
+
 const editModal = document.getElementById("editModal");
 const editTaskForm = document.getElementById("editTaskForm");
+
 const editTaskId = document.getElementById("editTaskId");
 const editTaskName = document.getElementById("editTaskName");
 const editDueDate = document.getElementById("editDueDate");
 const editPriority = document.getElementById("editPriority");
 const editCategory = document.getElementById("editCategory");
+
 const closeModalBtn = document.getElementById("closeModalBtn");
 
-// --- Toast Notification Helper ---
+// ===============================
+// Toast
+// ===============================
+
 function showToast(message, type = "success") {
   if (!toastBar) return;
+
   toastBar.textContent = message;
   toastBar.className = `show ${type}`;
+
   setTimeout(() => {
     toastBar.className = "";
   }, 3000);
 }
 
-// --- Category Tag Helper ---
+// ===============================
+// Category CSS Tags
+// ===============================
+
 function getCategoryTagClass(category) {
-  // Converts "CI/CD" -> "tag-cicd", "AWS" -> "tag-aws", "Terraform" -> "tag-terraform"
-  const cleanCategory = (category || "general")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, ""); // Fixed regex range (0-9)
-  return `tag tag-${cleanCategory}`;
+  const clean = (category || "general").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  return `tag tag-${clean}`;
 }
 
-// --- Auth Toggle (Login / Register) ---
-if (authToggleLink) {
-  authToggleLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    isRegisterMode = !isRegisterMode;
-    if (authError) authError.textContent = "";
+// ===============================
+// Authentication Toggle
+// ===============================
 
-    if (isRegisterMode) {
-      if (authTitle) authTitle.textContent = "Register";
-      if (authSubmitBtn) authSubmitBtn.textContent = "Register Account";
-      if (authToggleText)
-        authToggleText.textContent = "Already have an account?";
-      authToggleLink.textContent = "Login";
-    } else {
-      if (authTitle) authTitle.textContent = "Login";
-      if (authSubmitBtn) authSubmitBtn.textContent = "Login";
-      if (authToggleText) authToggleText.textContent = "Don't have an account?";
-      authToggleLink.textContent = "Register";
-    }
-  });
-}
+authToggleLink?.addEventListener("click", (e) => {
+  e.preventDefault();
 
-// --- Authentication Handler ---
-if (authSubmitBtn) {
-  authSubmitBtn.addEventListener("click", async () => {
-    const email = authEmail ? authEmail.value.trim() : "";
-    const password = authPassword ? authPassword.value.trim() : "";
+  isRegisterMode = !isRegisterMode;
 
-    if (!email || !password) {
-      if (authError)
-        authError.textContent = "Please provide both email and password.";
+  authError.textContent = "";
+
+  if (isRegisterMode) {
+    authTitle.textContent = "Register";
+
+    authSubmitBtn.textContent = "Register Account";
+
+    authToggleText.textContent = "Already have an account?";
+
+    authToggleLink.textContent = "Login";
+  } else {
+    authTitle.textContent = "Login";
+
+    authSubmitBtn.textContent = "Login";
+
+    authToggleText.textContent = "Don't have an account?";
+
+    authToggleLink.textContent = "Register";
+  }
+});
+
+// ===============================
+// Login / Register
+// ===============================
+
+authSubmitBtn?.addEventListener("click", async () => {
+  const email = authEmail.value.trim();
+
+  const password = authPassword.value.trim();
+
+  if (!email || !password) {
+    authError.textContent = "Email and password required";
+
+    return;
+  }
+
+  const endpoint = isRegisterMode ? "/api/auth/register" : "/api/auth/login";
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      authError.textContent = data.message || "Authentication failed";
+
       return;
     }
 
-    if (authError) authError.textContent = "";
-    const endpoint = isRegisterMode ? "/api/register" : "/api/login";
+    if (data.token) {
+      localStorage.setItem("token", data.token);
 
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (authError)
-          authError.textContent = data.message || "Authentication failed.";
-        return;
-      }
-
-      if (data.token) localStorage.setItem("token", data.token);
       localStorage.setItem("userEmail", email);
-
-      showToast(
-        isRegisterMode ? "Account registered successfully!" : "Logged in!",
-      );
-      checkAuth();
-    } catch (err) {
-      // Local fallback mode when API is unavailable
-      console.warn("Backend API offline. Authenticating locally.");
-      localStorage.setItem("token", "demo-token");
-      localStorage.setItem("userEmail", email);
-      checkAuth();
     }
-  });
-}
 
-// --- Check Session Status ---
+    showToast(isRegisterMode ? "Account created" : "Login successful");
+
+    checkAuth();
+  } catch (err) {
+    console.error(err);
+
+    showToast("Authentication failed", "error");
+  }
+});
+
+// ===============================
+// Session Check
+// ===============================
+
 function checkAuth() {
   const token = localStorage.getItem("token");
-  const userEmail = localStorage.getItem("userEmail");
 
-  if (token && userEmail) {
-    if (authSection) authSection.style.display = "none";
-    if (appSection) appSection.style.display = "block";
-    if (userEmailDisplay) userEmailDisplay.textContent = userEmail;
-    document.querySelector(".container")?.classList.remove("auth-mode");
+  const email = localStorage.getItem("userEmail");
+
+  if (token && email) {
+    authSection.style.display = "none";
+
+    appSection.style.display = "block";
+
+    userEmailDisplay.textContent = email;
+
     fetchTasks();
   } else {
-    if (authSection) authSection.style.display = "block";
-    if (appSection) appSection.style.display = "none";
-    document.querySelector(".container")?.classList.add("auth-mode");
+    authSection.style.display = "block";
+
+    appSection.style.display = "none";
   }
 }
 
-// --- Logout ---
-if (logoutBtn) {
-  logoutBtn.addEventListener("click", () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userEmail");
-    tasks = [];
-    checkAuth();
-    showToast("Logged out successfully");
-  });
-}
+// ===============================
+// Logout
+// ===============================
 
-// --- Dark Mode ---
-if (darkModeToggle) {
-  darkModeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
-    const isDark = document.body.classList.contains("dark-mode");
-    darkModeToggle.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
-  });
-}
+logoutBtn?.addEventListener("click", () => {
+  localStorage.removeItem("token");
 
-// --- Task Data Operations ---
+  localStorage.removeItem("userEmail");
+
+  tasks = [];
+
+  checkAuth();
+
+  showToast("Logged out");
+});
+
+// ===============================
+// Load Tasks From ECS Backend
+// ===============================
+
 async function fetchTasks() {
   try {
     const token = localStorage.getItem("token");
-    const res = await fetch(API_BASE, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      tasks = await res.json();
-    } else {
-      tasks = JSON.parse(localStorage.getItem("local_tasks") || "[]");
-    }
-  } catch (err) {
-    tasks = JSON.parse(localStorage.getItem("local_tasks") || "[]");
-  }
-  render();
-}
 
-async function saveTask(taskData) {
-  taskData.id = taskData.id || Date.now();
-  taskData.status = taskData.status || "Todo";
+    const res = await fetch(API_BASE, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Unable to load tasks");
+    }
+
+    tasks = await res.json();
+
+    render();
+  } catch (err) {
+    console.error("FETCH ERROR:", err);
+
+    showToast("Could not load tasks", "error");
+  }
+}
+// ===============================
+// Add Task
+// ===============================
+
+addTaskBtn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+
+  const name = document.getElementById("taskInput").value.trim();
+
+  const due_date = document.getElementById("dueDateInput").value || null;
+
+  const priority = document.getElementById("priorityInput").value;
+
+  const category = document.getElementById("categoryInput").value;
+
+  if (!name) {
+    showToast("Task name required", "error");
+
+    return;
+  }
 
   try {
     const token = localStorage.getItem("token");
+
     const res = await fetch(API_BASE, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
+
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(taskData),
+
+      body: JSON.stringify({
+        name,
+
+        due_date,
+
+        priority,
+
+        category,
+      }),
     });
-    if (res.ok) {
-      const savedTask = await res.json();
-      tasks.push(savedTask);
-    } else {
-      tasks.push(taskData);
+
+    if (!res.ok) {
+      throw new Error("Create failed");
     }
+
+    await fetchTasks();
+
+    document.getElementById("taskInput").value = "";
+
+    document.getElementById("dueDateInput").value = "";
+
+    showToast("Task created");
   } catch (err) {
-    tasks.push(taskData);
-  }
+    console.error(err);
 
-  localStorage.setItem("local_tasks", JSON.stringify(tasks));
-  render();
-}
-
-async function updateTaskStatus(id, newStatus) {
-  const task = tasks.find((t) => t.id === id);
-  if (task) {
-    task.status = newStatus;
-    localStorage.setItem("local_tasks", JSON.stringify(tasks));
-    render();
+    showToast("Create failed", "error");
   }
-}
+});
+
+// ===============================
+// Delete Task
+// ===============================
 
 async function deleteTask(id) {
-  tasks = tasks.filter((t) => t.id !== id);
-  localStorage.setItem("local_tasks", JSON.stringify(tasks));
-  render();
-  showToast("Task deleted", "error");
-}
+  try {
+    const token = localStorage.getItem("token");
 
-// --- Add Task Handler (Fixes input detection & Docker tag) ---
-if (addTaskBtn) {
-  addTaskBtn.addEventListener("click", (e) => {
-    e.preventDefault();
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: "DELETE",
 
-    // Fetch elements directly on click to get exact current value
-    const taskInput = document.getElementById("taskInput");
-    const dueDateInput = document.getElementById("dueDateInput");
-    const priorityInput = document.getElementById("priorityInput");
-    const categoryInput = document.getElementById("categoryInput");
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-    const name = taskInput ? taskInput.value.trim() : "";
+    const data = await res.json();
 
-    if (!name) {
-      showToast("Task name is required", "error");
+    if (!res.ok) {
+      showToast(data.message || "Delete failed", "error");
+
       return;
     }
 
-    const newTask = {
-      id: Date.now(),
-      name: name,
-      due_date: dueDateInput ? dueDateInput.value || null : null,
-      priority: priorityInput ? priorityInput.value : "Medium",
-      category: categoryInput ? categoryInput.value : "General",
-      status: "Todo",
-    };
+    await fetchTasks();
 
-    saveTask(newTask);
+    showToast("Task deleted");
+  } catch (err) {
+    console.error(err);
 
-    // Reset Form inputs
-    if (taskInput) taskInput.value = "";
-    if (dueDateInput) dueDateInput.value = "";
-
-    showToast("Task added successfully!");
-  });
+    showToast("Delete failed", "error");
+  }
 }
 
-// --- UI Renderers ---
+// ===============================
+// Update Status
+// ===============================
+
+async function updateTaskStatus(id, status) {
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`/api/tasks/${id}/status`, {
+      method: "PATCH",
+
+      headers: {
+        "Content-Type": "application/json",
+
+        Authorization: `Bearer ${token}`,
+      },
+
+      body: JSON.stringify({
+        status,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Status update failed");
+    }
+
+    await fetchTasks();
+
+    showToast("Status updated");
+  } catch (err) {
+    console.error(err);
+
+    showToast("Status update failed", "error");
+  }
+}
+
+// ===============================
+// Edit Task Save
+// ===============================
+
+editTaskForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const id = Number(editTaskId.value);
+
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: "PUT",
+
+      headers: {
+        "Content-Type": "application/json",
+
+        Authorization: `Bearer ${token}`,
+      },
+
+      body: JSON.stringify({
+        name: editTaskName.value.trim(),
+
+        due_date: editDueDate.value || null,
+
+        priority: editPriority.value,
+
+        category: editCategory.value,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Update failed");
+    }
+
+    await fetchTasks();
+
+    editModal.classList.remove("show");
+
+    showToast("Task updated");
+  } catch (err) {
+    console.error(err);
+
+    showToast("Update failed", "error");
+  }
+});
+
+// ===============================
+// Open Edit Modal
+// ===============================
+
+window.openEditModal = function (id) {
+  const task = tasks.find((t) => t.id === id);
+
+  if (!task) return;
+
+  editTaskId.value = task.id;
+
+  editTaskName.value = task.name;
+
+  editDueDate.value = task.due_date || "";
+
+  editPriority.value = task.priority;
+
+  editCategory.value = task.category;
+
+  editModal.classList.add("show");
+};
+
+closeModalBtn?.addEventListener("click", () => {
+  editModal.classList.remove("show");
+});
+// ===============================
+// Render
+// ===============================
+
 function render() {
   let filtered = filterTasks();
+
   filtered = sortTasks(filtered);
 
   renderStats(tasks);
+
   renderProgressBar(tasks);
 
   if (currentView === "table") {
@@ -287,270 +465,371 @@ function render() {
   }
 }
 
+// ===============================
+// Filter
+// ===============================
+
 function filterTasks() {
   const query = searchInput ? searchInput.value.toLowerCase() : "";
+
   return tasks.filter((task) => {
-    const matchesFilter =
+    const statusMatch =
       currentFilter === "All" || task.status === currentFilter;
-    const matchesSearch =
-      (task.name && task.name.toLowerCase().includes(query)) ||
-      (task.category && task.category.toLowerCase().includes(query));
-    return matchesFilter && matchesSearch;
+
+    const searchMatch =
+      task.name?.toLowerCase().includes(query) ||
+      task.category?.toLowerCase().includes(query);
+
+    return statusMatch && searchMatch;
   });
 }
 
-function renderProgressBar(taskListData) {
+// ===============================
+// Stats
+// ===============================
+
+function renderStats(data) {
+  if (!statsBar) return;
+
+  statsBar.innerHTML = `
+
+    <span>Total: ${data.length}</span>
+
+    <span>
+    Todo:
+    ${data.filter((t) => t.status === "Todo").length}
+    </span>
+
+
+    <span>
+    In Progress:
+    ${data.filter((t) => t.status === "In Progress").length}
+    </span>
+
+
+    <span>
+    Done:
+    ${data.filter((t) => t.status === "Done").length}
+    </span>
+
+    `;
+}
+
+// ===============================
+// Progress
+// ===============================
+
+function renderProgressBar(data) {
   if (!progressBar) return;
-  if (!taskListData.length) {
+
+  if (data.length === 0) {
     progressBar.style.width = "0%";
+
     return;
   }
-  const done = taskListData.filter((t) => t.status === "Done").length;
-  const percent = Math.round((done / taskListData.length) * 100);
+
+  const done = data.filter((t) => t.status === "Done").length;
+
+  const percent = Math.round((done / data.length) * 100);
+
   progressBar.style.width = `${percent}%`;
 }
 
-function renderStats(taskListData) {
-  if (!statsBar) return;
-  const total = taskListData.length;
-  const todo = taskListData.filter((t) => t.status === "Todo").length;
-  const inProgress = taskListData.filter(
-    (t) => t.status === "In Progress",
-  ).length;
-  const done = taskListData.filter((t) => t.status === "Done").length;
+// ===============================
+// Table
+// ===============================
 
-  statsBar.innerHTML = `
-    <span>Total: ${total}</span>
-    <span>Todo: ${todo}</span>
-    <span>In Progress: ${inProgress}</span>
-    <span>Done: ${done}</span>
-  `;
-}
-
-function getDueDateStatusClass(dueDateStr, status) {
-  if (!dueDateStr || status === "Done") return "";
-  const now = new Date();
-  const due = new Date(dueDateStr);
-  const diffHours = (due - now) / (1000 * 60 * 60);
-
-  if (diffHours < 0) return "overdue";
-  if (diffHours <= 48) return "due-soon";
-  return "";
-}
-
-// --- Table View Render ---
-function renderTable(taskListData) {
-  if (!taskList) return;
+function renderTable(data) {
   taskList.innerHTML = "";
 
-  taskListData.forEach((task) => {
-    const tr = document.createElement("tr");
-    const warningClass = getDueDateStatusClass(task.due_date, task.status);
-    if (warningClass) tr.classList.add(warningClass);
+  data.forEach((task) => {
+    const row = document.createElement("tr");
 
-    tr.innerHTML = `
-      <td><strong>${task.name}</strong></td>
-      <td><span class="${getCategoryTagClass(task.category)}">${task.category}</span></td>
-      <td><span class="badge badge-${(task.priority || "low").toLowerCase()}">${task.priority}</span></td>
-      <td>${task.due_date || "—"}</td>
-      <td>
-        <select onchange="updateTaskStatus(${task.id}, this.value)">
-          <option value="Todo" ${task.status === "Todo" ? "selected" : ""}>Todo</option>
-          <option value="In Progress" ${task.status === "In Progress" ? "selected" : ""}>In Progress</option>
-          <option value="Done" ${task.status === "Done" ? "selected" : ""}>Done</option>
+    row.innerHTML = `
+
+        <td>
+        <strong>${task.name}</strong>
+        </td>
+
+
+        <td>
+        <span class="${getCategoryTagClass(task.category)}">
+        ${task.category}
+        </span>
+        </td>
+
+
+        <td>
+        <span class="badge badge-${task.priority.toLowerCase()}">
+        ${task.priority}
+        </span>
+        </td>
+
+
+        <td>
+        ${task.due_date || "—"}
+        </td>
+
+
+        <td>
+
+
+        <select onchange="updateTaskStatus(${task.id},this.value)">
+
+
+        <option ${task.status === "Todo" ? "selected" : ""}>
+        Todo
+        </option>
+
+
+        <option ${task.status === "In Progress" ? "selected" : ""}>
+        In Progress
+        </option>
+
+
+        <option ${task.status === "Done" ? "selected" : ""}>
+        Done
+        </option>
+
+
         </select>
-      </td>
-      <td>
-        <button class="icon-btn edit-icon-btn" onclick="openEditModal(${task.id})">✏️</button>
-        <button class="icon-btn delete-icon-btn" onclick="deleteTask(${task.id})">🗑️</button>
-      </td>
-    `;
-    taskList.appendChild(tr);
+
+
+        </td>
+
+
+
+        <td>
+
+
+        <button onclick="openEditModal(${task.id})">
+        ✏️
+        </button>
+
+
+        <button onclick="deleteTask(${task.id})">
+        🗑️
+        </button>
+
+
+        </td>
+
+
+        `;
+
+    taskList.appendChild(row);
   });
 }
 
-// --- Kanban View Render ---
-function renderBoardView(taskListData) {
-  const cardsTodo = document.getElementById("cardsTodo");
-  const cardsInProgress = document.getElementById("cardsInProgress");
-  const cardsDone = document.getElementById("cardsDone");
+// ===============================
+// Board View
+// ===============================
 
-  if (!cardsTodo || !cardsInProgress || !cardsDone) return;
+function renderBoardView(data) {
+  const todo = document.getElementById("cardsTodo");
 
-  cardsTodo.innerHTML = "";
-  cardsInProgress.innerHTML = "";
-  cardsDone.innerHTML = "";
+  const progress = document.getElementById("cardsInProgress");
 
-  const counts = { Todo: 0, "In Progress": 0, Done: 0 };
+  const done = document.getElementById("cardsDone");
 
-  taskListData.forEach((task) => {
-    counts[task.status] = (counts[task.status] || 0) + 1;
+  todo.innerHTML = "";
 
+  progress.innerHTML = "";
+
+  done.innerHTML = "";
+
+  data.forEach((task) => {
     const card = document.createElement("div");
-    card.className = `task-card ${getDueDateStatusClass(task.due_date, task.status)}`;
-    card.setAttribute("data-id", task.id);
+
+    card.className = "task-card";
+
+    card.dataset.id = task.id;
 
     card.innerHTML = `
-    <div class="card-name">${task.name}</div>
-    <div class="card-due">📅 ${task.due_date || "No due date"}</div>
-    <div style="margin-bottom: 8px;">
-    <span class="${getCategoryTagClass(task.category)}">${task.category}</span>
-    <span class="badge badge-${(task.priority || "low").toLowerCase()}">${task.priority}</span>
-  </div>
-      <div class="card-actions">
-        <button class="icon-btn edit-icon-btn" onclick="openEditModal(${task.id})">✏️ Edit</button>
-        <button class="icon-btn delete-icon-btn" onclick="deleteTask(${task.id})">🗑️</button>
-      </div>
-    `;
 
-    if (task.status === "Todo") cardsTodo.appendChild(card);
-    else if (task.status === "In Progress") cardsInProgress.appendChild(card);
-    else if (task.status === "Done") cardsDone.appendChild(card);
+<div>
+<strong>${task.name}</strong>
+</div>
+
+
+<div>
+${task.category}
+</div>
+
+
+<div>
+${task.priority}
+</div>
+
+
+<button onclick="openEditModal(${task.id})">
+✏️
+</button>
+
+
+<button onclick="deleteTask(${task.id})">
+🗑️
+</button>
+
+
+`;
+
+    if (task.status === "Todo") todo.appendChild(card);
+
+    if (task.status === "In Progress") progress.appendChild(card);
+
+    if (task.status === "Done") done.appendChild(card);
   });
-
-  const cTodo = document.getElementById("countTodo");
-  const cProg = document.getElementById("countInProgress");
-  const cDone = document.getElementById("countDone");
-
-  if (cTodo) cTodo.textContent = counts["Todo"];
-  if (cProg) cProg.textContent = counts["In Progress"];
-  if (cDone) cDone.textContent = counts["Done"];
 
   initDragAndDrop();
 }
 
+// ===============================
+// Drag Drop
+// ===============================
+
 function initDragAndDrop() {
-  sortableInstances.forEach((inst) => inst.destroy());
+  sortableInstances.forEach((s) => s.destroy());
+
   sortableInstances = [];
 
-  const columns = ["cardsTodo", "cardsInProgress", "cardsDone"];
-  columns.forEach((colId) => {
-    const el = document.getElementById(colId);
-    if (!el || typeof Sortable === "undefined") return;
+  ["cardsTodo", "cardsInProgress", "cardsDone"].forEach((id) => {
+    const el = document.getElementById(id);
+
+    if (!el) return;
 
     const sortable = new Sortable(el, {
       group: "kanban",
+
       animation: 150,
-      onEnd: function (evt) {
-        const taskId = Number(evt.item.getAttribute("data-id"));
-        const targetColumn = evt.to.parentElement.getAttribute("data-status");
-        if (taskId && targetColumn) {
-          updateTaskStatus(taskId, targetColumn);
-        }
+
+      onEnd(evt) {
+        const taskId = Number(evt.item.dataset.id);
+
+        const status = evt.to.parentElement.dataset.status;
+
+        updateTaskStatus(taskId, status);
       },
     });
+
     sortableInstances.push(sortable);
   });
 }
 
-// --- Table Header Sorting ---
-document.querySelectorAll("th.sortable").forEach((header) => {
+// ===============================
+// Sorting
+// ===============================
+
+document.querySelectorAll(".sortable").forEach((header) => {
   header.addEventListener("click", () => {
-    const column = header.getAttribute("data-sort");
+    const column = header.dataset.sort;
+
     if (currentSortColumn === column) {
       currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
     } else {
       currentSortColumn = column;
+
       currentSortDirection = "asc";
     }
+
     render();
   });
 });
 
-function sortTasks(taskListData) {
-  if (!currentSortColumn) return taskListData;
+function sortTasks(data) {
+  if (!currentSortColumn) return data;
 
-  return [...taskListData].sort((a, b) => {
-    let valA = a[currentSortColumn] || "";
-    let valB = b[currentSortColumn] || "";
+  return [...data].sort((a, b) => {
+    let A = a[currentSortColumn] || "";
+
+    let B = b[currentSortColumn] || "";
 
     if (currentSortColumn === "priority") {
-      const pMap = { High: 3, Medium: 2, Low: 1 };
-      valA = pMap[valA] || 0;
-      valB = pMap[valB] || 0;
+      const map = {
+        High: 3,
+        Medium: 2,
+        Low: 1,
+      };
+
+      A = map[A];
+
+      B = map[B];
     }
 
-    if (valA < valB) return currentSortDirection === "asc" ? -1 : 1;
-    if (valA > valB) return currentSortDirection === "asc" ? 1 : -1;
+    if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+
+    if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+
     return 0;
   });
 }
 
-// --- Views & Filters ---
+// ===============================
+// Filters
+// ===============================
+
 filterBtns.forEach((btn) => {
   btn.addEventListener("click", () => {
     filterBtns.forEach((b) => b.classList.remove("active"));
+
     btn.classList.add("active");
-    currentFilter = btn.getAttribute("data-filter");
+
+    currentFilter = btn.dataset.filter;
+
     render();
   });
 });
 
-if (tableViewBtn) {
-  tableViewBtn.addEventListener("click", () => {
-    currentView = "table";
-    tableViewBtn.classList.add("active");
-    if (boardViewBtn) boardViewBtn.classList.remove("active");
-    if (taskTable) taskTable.style.display = "table";
-    if (boardView) boardView.style.display = "none";
-    render();
-  });
-}
+// ===============================
+// Search
+// ===============================
 
-if (boardViewBtn) {
-  boardViewBtn.addEventListener("click", () => {
-    currentView = "board";
-    boardViewBtn.classList.add("active");
-    if (tableViewBtn) tableViewBtn.classList.remove("active");
-    if (taskTable) taskTable.style.display = "none";
-    if (boardView) boardView.style.display = "flex";
-    render();
-  });
-}
+searchInput?.addEventListener("input", render);
 
-if (searchInput) searchInput.addEventListener("input", render);
+// ===============================
+// Views
+// ===============================
 
-// --- Edit Modal Handlers ---
-window.openEditModal = function (id) {
-  const task = tasks.find((t) => t.id === id);
-  if (!task || !editModal) return;
+tableViewBtn?.addEventListener("click", () => {
+  currentView = "table";
 
-  editTaskId.value = task.id;
-  editTaskName.value = task.name;
-  editDueDate.value = task.due_date || "";
-  editPriority.value = task.priority;
-  editCategory.value = task.category;
+  tableViewBtn.classList.add("active");
 
-  editModal.classList.add("show");
-};
+  boardViewBtn.classList.remove("active");
 
-if (closeModalBtn) {
-  closeModalBtn.addEventListener("click", () => {
-    if (editModal) editModal.classList.remove("show");
-  });
-}
+  taskTable.style.display = "table";
 
-if (editTaskForm) {
-  editTaskForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const id = Number(editTaskId.value);
-    const task = tasks.find((t) => t.id === id);
+  boardView.style.display = "none";
 
-    if (task) {
-      task.name = editTaskName.value.trim();
-      task.due_date = editDueDate.value || null;
-      task.priority = editPriority.value;
-      task.category = editCategory.value;
+  render();
+});
 
-      localStorage.setItem("local_tasks", JSON.stringify(tasks));
-      if (editModal) editModal.classList.remove("show");
-      render();
-      showToast("Task updated!");
-    }
-  });
-}
+boardViewBtn?.addEventListener("click", () => {
+  currentView = "board";
 
-// --- Initialization ---
+  boardViewBtn.classList.add("active");
+
+  tableViewBtn.classList.remove("active");
+
+  taskTable.style.display = "none";
+
+  boardView.style.display = "flex";
+
+  render();
+});
+
+// ===============================
+// Dark Mode
+// ===============================
+
+darkModeToggle?.addEventListener("click", () => {
+  document.body.classList.toggle("dark-mode");
+});
+
+// ===============================
+// Start Application
+// ===============================
+
 document.addEventListener("DOMContentLoaded", () => {
   checkAuth();
 });
