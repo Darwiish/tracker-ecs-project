@@ -1,338 +1,508 @@
 // ===============================
+// Config
+// ===============================
+
+const API_BASE =
+  window.location.hostname === "localhost" ? "http://localhost:5000" : "/api";
+const STATUSES = ["Todo", "In Progress", "Done"];
+const PAGE_SIZE = 10;
+
+// ===============================
 // Global State
 // ===============================
 
-let tasks = [];
-let currentFilter = "All";
-let currentView = "table";
-let currentSortColumn = null;
-let currentSortDirection = "asc";
 let isRegisterMode = false;
+let currentFilter = "All";
+let allTasks = [];
+let currentPage = 1;
+let currentView = "table";
 let sortableInstances = [];
-
-const API_BASE = "/api/tasks";
+let toastTimeout;
 
 // ===============================
-// DOM Elements
+// Icons (pen / bin / restore)
 // ===============================
 
-const authSection = document.getElementById("authSection");
-const appSection = document.getElementById("appSection");
+const PEN_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
 
-const authTitle = document.getElementById("authTitle");
-const authEmail = document.getElementById("authEmail");
-const authPassword = document.getElementById("authPassword");
-const authSubmitBtn = document.getElementById("authSubmitBtn");
+const BIN_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>`;
 
-const authToggleText = document.getElementById("authToggleText");
-const authToggleLink = document.getElementById("authToggleLink");
-const authError = document.getElementById("authError");
+const RESTORE_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M3 11a9 9 0 1 1 2.6 6.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3 5v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
 
-const userEmailDisplay = document.getElementById("userEmailDisplay");
-const logoutBtn = document.getElementById("logoutBtn");
+function createEditButton(task) {
+  const btn = document.createElement("button");
+  btn.className = "icon-btn edit-icon-btn";
+  btn.innerHTML = PEN_ICON_SVG;
+  btn.title = "Edit task";
+  btn.setAttribute("aria-label", "Edit task");
+  btn.onclick = () => editTask(task);
+  return btn;
+}
 
-const toastBar = document.getElementById("toastBar");
-const darkModeToggle = document.getElementById("darkModeToggle");
+function createDeleteButton(id, name) {
+  const btn = document.createElement("button");
+  btn.className = "icon-btn delete-icon-btn";
+  btn.innerHTML = BIN_ICON_SVG;
+  btn.title = "Delete task";
+  btn.setAttribute("aria-label", "Delete task");
+  btn.onclick = () => deleteTask(id, name);
+  return btn;
+}
 
-const progressBar = document.getElementById("progressBar");
-const statsBar = document.getElementById("statsBar");
-
-const filterBtns = document.querySelectorAll(".filter-btn");
-
-const tableViewBtn = document.getElementById("tableViewBtn");
-const boardViewBtn = document.getElementById("boardViewBtn");
-
-const taskTable = document.getElementById("taskTable");
-const boardView = document.getElementById("boardView");
-
-const taskList = document.getElementById("taskList");
-
-const addTaskBtn = document.getElementById("addTaskBtn");
-const searchInput = document.getElementById("searchInput");
-
-// Modal
-
-const editModal = document.getElementById("editModal");
-const editTaskForm = document.getElementById("editTaskForm");
-
-const editTaskId = document.getElementById("editTaskId");
-const editTaskName = document.getElementById("editTaskName");
-const editDueDate = document.getElementById("editDueDate");
-const editPriority = document.getElementById("editPriority");
-const editCategory = document.getElementById("editCategory");
-
-const closeModalBtn = document.getElementById("closeModalBtn");
+function createRestoreButton(id) {
+  const btn = document.createElement("button");
+  btn.className = "icon-btn restore-icon-btn";
+  btn.innerHTML = RESTORE_ICON_SVG;
+  btn.title = "Restore to In Progress";
+  btn.setAttribute("aria-label", "Restore to In Progress");
+  btn.onclick = () => updateStatus(id, "In Progress");
+  return btn;
+}
 
 // ===============================
 // Toast
 // ===============================
 
-function showToast(message, type = "success") {
-  if (!toastBar) return;
-
-  toastBar.textContent = message;
-  toastBar.className = `show ${type}`;
-
-  setTimeout(() => {
-    toastBar.className = "";
+function showToast(message, type = "error") {
+  const toast = document.getElementById("toastBar");
+  toast.textContent = message;
+  toast.className = `show ${type}`;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toast.className = "";
   }, 3000);
 }
 
 // ===============================
-// Category CSS Tags
+// Auth State Helpers
 // ===============================
 
-function getCategoryTagClass(category) {
-  const clean = (category || "general").toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  return `tag tag-${clean}`;
+function getToken() {
+  return localStorage.getItem("token");
 }
 
-// ===============================
-// Authentication Toggle
-// ===============================
+function getEmail() {
+  return localStorage.getItem("email");
+}
 
-authToggleLink?.addEventListener("click", (e) => {
-  e.preventDefault();
+function setSession(token, email) {
+  localStorage.setItem("token", token);
+  localStorage.setItem("email", email);
+}
 
-  isRegisterMode = !isRegisterMode;
+function clearSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("email");
+}
 
-  authError.textContent = "";
+function showApp() {
+  document.querySelector(".container").classList.remove("auth-mode");
+  document.getElementById("authSection").style.display = "none";
+  document.getElementById("appSection").style.display = "block";
+  document.getElementById("userEmailDisplay").textContent = getEmail();
+  fetchTasks();
+}
 
-  if (isRegisterMode) {
-    authTitle.textContent = "Register";
-
-    authSubmitBtn.textContent = "Register Account";
-
-    authToggleText.textContent = "Already have an account?";
-
-    authToggleLink.textContent = "Login";
-  } else {
-    authTitle.textContent = "Login";
-
-    authSubmitBtn.textContent = "Login";
-
-    authToggleText.textContent = "Don't have an account?";
-
-    authToggleLink.textContent = "Register";
-  }
-});
+function showAuth() {
+  document.querySelector(".container").classList.add("auth-mode");
+  document.getElementById("authSection").style.display = "block";
+  document.getElementById("appSection").style.display = "none";
+}
 
 // ===============================
 // Login / Register
 // ===============================
 
-authSubmitBtn?.addEventListener("click", async () => {
-  const email = authEmail.value.trim();
-
-  const password = authPassword.value.trim();
+async function handleAuthSubmit() {
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errorEl = document.getElementById("authError");
+  const submitBtn = document.getElementById("authSubmitBtn");
+  errorEl.textContent = "";
 
   if (!email || !password) {
-    authError.textContent = "Email and password required";
-
+    errorEl.textContent = "Email and password are required";
     return;
   }
 
-  const endpoint = isRegisterMode ? "/api/auth/register" : "/api/auth/login";
+  const endpoint = isRegisterMode ? "/auth/register" : "/auth/login";
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Please wait...";
 
   try {
-    const res = await fetch(endpoint, {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       method: "POST",
-
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify({
-        email,
-        password,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
-
     const data = await res.json();
 
     if (!res.ok) {
-      authError.textContent = data.message || "Authentication failed";
-
+      errorEl.textContent = data.message || "Something went wrong";
       return;
     }
 
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-
-      localStorage.setItem("userEmail", email);
+    if (isRegisterMode) {
+      isRegisterMode = false;
+      updateAuthUI();
+      errorEl.style.color = "#166534";
+      errorEl.textContent = "Registered! Please log in.";
+    } else {
+      setSession(data.token, email);
+      showApp();
     }
-
-    showToast(isRegisterMode ? "Account created" : "Login successful");
-
-    checkAuth();
   } catch (err) {
     console.error(err);
-
-    showToast("Authentication failed", "error");
+    errorEl.textContent = "Could not reach server";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
   }
-});
+}
+
+function updateAuthUI() {
+  document.getElementById("authTitle").textContent = isRegisterMode
+    ? "Register"
+    : "Login";
+  document.getElementById("authSubmitBtn").textContent = isRegisterMode
+    ? "Register"
+    : "Login";
+  document.getElementById("authToggleText").textContent = isRegisterMode
+    ? "Already have an account?"
+    : "Don't have an account?";
+  document.getElementById("authToggleLink").textContent = isRegisterMode
+    ? "Login"
+    : "Register";
+  document.getElementById("authError").style.color = "#b91c1c";
+  document.getElementById("authError").textContent = "";
+}
+
+function logout() {
+  clearSession();
+  showAuth();
+}
 
 // ===============================
-// Session Check
+// Authenticated Fetch Wrapper
 // ===============================
 
-function checkAuth() {
-  const token = localStorage.getItem("token");
+async function authFetch(url, options = {}) {
+  const token = getToken();
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-  const email = localStorage.getItem("userEmail");
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error("Session expired");
+  }
 
-  if (token && email) {
-    authSection.style.display = "none";
+  return res;
+}
 
-    appSection.style.display = "block";
+// ===============================
+// Load Tasks
+// ===============================
 
-    userEmailDisplay.textContent = email;
+async function fetchTasks(search = "") {
+  const url = search
+    ? `${API_BASE}/tasks?search=${encodeURIComponent(search)}`
+    : `${API_BASE}/tasks`;
+  try {
+    const res = await authFetch(url);
+    if (!res.ok) throw new Error("Failed to load tasks");
+    allTasks = await res.json();
+    currentPage = 1;
+    renderStats(allTasks);
+    renderTasks(applyFilter(allTasks));
+  } catch (err) {
+    if (err.message !== "Session expired") {
+      showToast("Could not load tasks. Please try again.");
+    }
+  }
+}
 
-    fetchTasks();
+// ===============================
+// Filtering
+// ===============================
+
+function applyFilter(tasks) {
+  if (currentFilter === "All") return tasks;
+  return tasks.filter((t) => t.status === currentFilter);
+}
+
+// ===============================
+// Stats
+// ===============================
+
+function renderStats(tasks) {
+  const total = tasks.length;
+  const todo = tasks.filter((t) => t.status === "Todo").length;
+  const inProgress = tasks.filter((t) => t.status === "In Progress").length;
+  const done = tasks.filter((t) => t.status === "Done").length;
+
+  document.getElementById("statsBar").innerHTML = `
+        <span>Total: ${total}</span>
+        <span>Todo: ${todo}</span>
+        <span>In Progress: ${inProgress}</span>
+        <span>Done: ${done}</span>
+    `;
+}
+
+// ===============================
+// Table View
+// ===============================
+
+function renderTasks(tasks) {
+  const list = document.getElementById("taskList");
+  list.innerHTML = "";
+
+  const totalPages = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageTasks = tasks.slice(start, start + PAGE_SIZE);
+
+  pageTasks.forEach((task) => {
+    const tr = document.createElement("tr");
+
+    const nameTd = document.createElement("td");
+    nameTd.textContent = task.name;
+    nameTd.setAttribute("data-label", "Task");
+
+    const dueTd = document.createElement("td");
+    dueTd.textContent = task.due_date || "—";
+    dueTd.setAttribute("data-label", "Due Date");
+
+    const statusTd = document.createElement("td");
+    statusTd.setAttribute("data-label", "Status");
+    const statusSelect = document.createElement("select");
+    STATUSES.forEach((s) => {
+      const option = document.createElement("option");
+      option.value = s;
+      option.textContent = s;
+      if (s === task.status) option.selected = true;
+      statusSelect.appendChild(option);
+    });
+    statusSelect.onchange = () => updateStatus(task.id, statusSelect.value);
+    statusTd.appendChild(statusSelect);
+
+    const actionsTd = document.createElement("td");
+    actionsTd.setAttribute("data-label", "Actions");
+
+    if (task.status === "Done") {
+      actionsTd.appendChild(createRestoreButton(task.id));
+    }
+
+    actionsTd.appendChild(createEditButton(task));
+    actionsTd.appendChild(createDeleteButton(task.id, task.name));
+
+    tr.appendChild(nameTd);
+    tr.appendChild(dueTd);
+    tr.appendChild(statusTd);
+    tr.appendChild(actionsTd);
+
+    list.appendChild(tr);
+  });
+
+  renderPagination(tasks.length, totalPages);
+
+  if (currentView === "board") {
+    renderBoard(tasks);
+  }
+}
+
+// ===============================
+// Pagination
+// ===============================
+
+function renderPagination(totalItems, totalPages) {
+  const bar = document.getElementById("paginationBar");
+  bar.innerHTML = "";
+
+  if (totalItems <= PAGE_SIZE) return;
+
+  const prevBtn = document.createElement("button");
+  prevBtn.textContent = "Previous";
+  prevBtn.disabled = currentPage === 1;
+  prevBtn.onclick = () => {
+    currentPage--;
+    renderTasks(applyFilter(allTasks));
+  };
+
+  const pageLabel = document.createElement("span");
+  pageLabel.textContent = `Page ${currentPage} of ${totalPages}`;
+
+  const nextBtn = document.createElement("button");
+  nextBtn.textContent = "Next";
+  nextBtn.disabled = currentPage === totalPages;
+  nextBtn.onclick = () => {
+    currentPage++;
+    renderTasks(applyFilter(allTasks));
+  };
+
+  bar.appendChild(prevBtn);
+  bar.appendChild(pageLabel);
+  bar.appendChild(nextBtn);
+}
+
+// ===============================
+// Kanban Board View
+// ===============================
+
+function renderBoard(tasks) {
+  const columns = {
+    Todo: document.getElementById("cardsTodo"),
+    "In Progress": document.getElementById("cardsInProgress"),
+    Done: document.getElementById("cardsDone"),
+  };
+
+  Object.values(columns).forEach((col) => (col.innerHTML = ""));
+
+  const counts = { Todo: 0, "In Progress": 0, Done: 0 };
+
+  tasks.forEach((task) => {
+    counts[task.status]++;
+
+    const card = document.createElement("div");
+    card.className = "task-card";
+    card.dataset.taskId = task.id;
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "card-name";
+    nameEl.textContent = task.name;
+
+    const dueEl = document.createElement("div");
+    dueEl.className = "card-due";
+    dueEl.textContent = task.due_date ? `Due: ${task.due_date}` : "No due date";
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "card-actions";
+    if (task.status === "Done") {
+      actionsEl.appendChild(createRestoreButton(task.id));
+    }
+    actionsEl.appendChild(createEditButton(task));
+    actionsEl.appendChild(createDeleteButton(task.id, task.name));
+
+    card.appendChild(nameEl);
+    card.appendChild(dueEl);
+    card.appendChild(actionsEl);
+
+    columns[task.status].appendChild(card);
+  });
+
+  document.getElementById("countTodo").textContent = counts["Todo"];
+  document.getElementById("countInProgress").textContent =
+    counts["In Progress"];
+  document.getElementById("countDone").textContent = counts["Done"];
+
+  setupDragAndDrop();
+}
+
+// ===============================
+// Drag And Drop (SortableJS)
+// ===============================
+
+function setupDragAndDrop() {
+  sortableInstances.forEach((s) => s.destroy());
+  sortableInstances = [];
+
+  document.querySelectorAll(".column-cards").forEach((columnEl) => {
+    const sortable = Sortable.create(columnEl, {
+      group: "tasks",
+      animation: 150,
+      forceFallback: true,
+      fallbackTolerance: 3,
+      onAdd: (evt) => {
+        const taskId = evt.item.dataset.taskId;
+        const newStatus = evt.to.closest(".board-column").dataset.status;
+        updateStatus(taskId, newStatus);
+      },
+    });
+    sortableInstances.push(sortable);
+  });
+}
+
+// ===============================
+// View Switching (Table / Board)
+// ===============================
+
+function switchView(view) {
+  currentView = view;
+  const tableEl = document.getElementById("taskTable");
+  const boardEl = document.getElementById("boardView");
+  const paginationEl = document.getElementById("paginationBar");
+
+  if (view === "table") {
+    tableEl.style.display = "table";
+    boardEl.style.display = "none";
+    paginationEl.style.display = "flex";
+    document.getElementById("tableViewBtn").classList.add("active");
+    document.getElementById("boardViewBtn").classList.remove("active");
+    renderTasks(applyFilter(allTasks));
   } else {
-    authSection.style.display = "block";
-
-    appSection.style.display = "none";
+    tableEl.style.display = "none";
+    boardEl.style.display = "flex";
+    paginationEl.style.display = "none";
+    document.getElementById("tableViewBtn").classList.remove("active");
+    document.getElementById("boardViewBtn").classList.add("active");
+    renderBoard(applyFilter(allTasks));
   }
 }
 
 // ===============================
-// Logout
+// Edit Task (prompt-based)
 // ===============================
 
-logoutBtn?.addEventListener("click", () => {
-  localStorage.removeItem("token");
+function editTask(task) {
+  const newName = prompt("Edit task name:", task.name);
+  if (newName === null || newName.trim() === "") return;
 
-  localStorage.removeItem("userEmail");
+  const newDueDate = prompt(
+    "Edit due date (YYYY-MM-DD, leave blank for none):",
+    task.due_date || "",
+  );
+  if (newDueDate === null) return;
 
-  tasks = [];
-
-  checkAuth();
-
-  showToast("Logged out");
-});
-
-// ===============================
-// Load Tasks From ECS Backend
-// ===============================
-
-async function fetchTasks() {
-  try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(API_BASE, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!res.ok) {
-      throw new Error("Unable to load tasks");
-    }
-
-    tasks = await res.json();
-
-    render();
-  } catch (err) {
-    console.error("FETCH ERROR:", err);
-
-    showToast("Could not load tasks", "error");
-  }
+  updateTask(task.id, newName.trim(), newDueDate.trim());
 }
+
 // ===============================
-// Add Task
+// Update Task (name / due date)
 // ===============================
 
-addTaskBtn?.addEventListener("click", async (e) => {
-  e.preventDefault();
-
-  const name = document.getElementById("taskInput").value.trim();
-
-  const due_date = document.getElementById("dueDateInput").value || null;
-
-  const priority = document.getElementById("priorityInput").value;
-
-  const category = document.getElementById("categoryInput").value;
-
-  if (!name) {
-    showToast("Task name required", "error");
-
-    return;
-  }
-
+async function updateTask(id, name, due_date) {
   try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(API_BASE, {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json",
-
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: JSON.stringify({
-        name,
-
-        due_date,
-
-        priority,
-
-        category,
-      }),
+    const res = await authFetch(`${API_BASE}/tasks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, due_date }),
     });
-
-    if (!res.ok) {
-      throw new Error("Create failed");
-    }
-
-    await fetchTasks();
-
-    document.getElementById("taskInput").value = "";
-
-    document.getElementById("dueDateInput").value = "";
-
-    showToast("Task created");
+    if (!res.ok) throw new Error();
+    showToast("Task updated", "success");
+    fetchTasks(document.getElementById("searchInput").value);
   } catch (err) {
-    console.error(err);
-
-    showToast("Create failed", "error");
-  }
-});
-
-// ===============================
-// Delete Task
-// ===============================
-
-async function deleteTask(id) {
-  try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`/api/tasks/${id}`, {
-      method: "DELETE",
-
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      showToast(data.message || "Delete failed", "error");
-
-      return;
+    if (err.message !== "Session expired") {
+      showToast("Failed to update task. Please try again.");
     }
-
-    await fetchTasks();
-
-    showToast("Task deleted");
-  } catch (err) {
-    console.error(err);
-
-    showToast("Delete failed", "error");
   }
 }
 
@@ -340,496 +510,128 @@ async function deleteTask(id) {
 // Update Status
 // ===============================
 
-async function updateTaskStatus(id, status) {
+async function updateStatus(id, status) {
   try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`/api/tasks/${id}/status`, {
+    const res = await authFetch(`${API_BASE}/tasks/${id}/status`, {
       method: "PATCH",
-
-      headers: {
-        "Content-Type": "application/json",
-
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: JSON.stringify({
-        status,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
     });
-
-    if (!res.ok) {
-      throw new Error("Status update failed");
-    }
-
-    await fetchTasks();
-
-    showToast("Status updated");
+    if (!res.ok) throw new Error();
+    fetchTasks(document.getElementById("searchInput").value);
   } catch (err) {
-    console.error(err);
-
-    showToast("Status update failed", "error");
+    if (err.message !== "Session expired") {
+      showToast("Failed to update status. Please try again.");
+    }
   }
 }
 
 // ===============================
-// Edit Task Save
+// Delete Task
 // ===============================
 
-editTaskForm?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const id = Number(editTaskId.value);
+async function deleteTask(id, name) {
+  const confirmed = confirm(`Delete "${name}"? This cannot be undone.`);
+  if (!confirmed) return;
 
   try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`/api/tasks/${id}`, {
-      method: "PUT",
-
-      headers: {
-        "Content-Type": "application/json",
-
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: JSON.stringify({
-        name: editTaskName.value.trim(),
-
-        due_date: editDueDate.value || null,
-
-        priority: editPriority.value,
-
-        category: editCategory.value,
-      }),
+    const res = await authFetch(`${API_BASE}/tasks/${id}`, {
+      method: "DELETE",
     });
-
-    if (!res.ok) {
-      throw new Error("Update failed");
-    }
-
-    await fetchTasks();
-
-    editModal.classList.remove("show");
-
-    showToast("Task updated");
+    if (!res.ok) throw new Error();
+    showToast("Task deleted", "success");
+    fetchTasks(document.getElementById("searchInput").value);
   } catch (err) {
-    console.error(err);
-
-    showToast("Update failed", "error");
-  }
-});
-
-// ===============================
-// Open Edit Modal
-// ===============================
-
-window.openEditModal = function (id) {
-  const task = tasks.find((t) => t.id === id);
-
-  if (!task) return;
-
-  editTaskId.value = task.id;
-
-  editTaskName.value = task.name;
-
-  editDueDate.value = task.due_date || "";
-
-  editPriority.value = task.priority;
-
-  editCategory.value = task.category;
-
-  editModal.classList.add("show");
-};
-
-closeModalBtn?.addEventListener("click", () => {
-  editModal.classList.remove("show");
-});
-// ===============================
-// Render
-// ===============================
-
-function render() {
-  let filtered = filterTasks();
-
-  filtered = sortTasks(filtered);
-
-  renderStats(tasks);
-
-  renderProgressBar(tasks);
-
-  if (currentView === "table") {
-    renderTable(filtered);
-  } else {
-    renderBoardView(filtered);
+    if (err.message !== "Session expired") {
+      showToast("Failed to delete task. Please try again.");
+    }
   }
 }
 
 // ===============================
-// Filter
+// Add Task
 // ===============================
 
-function filterTasks() {
-  const query = searchInput ? searchInput.value.toLowerCase() : "";
-
-  return tasks.filter((task) => {
-    const statusMatch =
-      currentFilter === "All" || task.status === currentFilter;
-
-    const searchMatch =
-      task.name?.toLowerCase().includes(query) ||
-      task.category?.toLowerCase().includes(query);
-
-    return statusMatch && searchMatch;
-  });
-}
-
-// ===============================
-// Stats
-// ===============================
-
-function renderStats(data) {
-  if (!statsBar) return;
-
-  statsBar.innerHTML = `
-
-    <span>Total: ${data.length}</span>
-
-    <span>
-    Todo:
-    ${data.filter((t) => t.status === "Todo").length}
-    </span>
-
-
-    <span>
-    In Progress:
-    ${data.filter((t) => t.status === "In Progress").length}
-    </span>
-
-
-    <span>
-    Done:
-    ${data.filter((t) => t.status === "Done").length}
-    </span>
-
-    `;
-}
-
-// ===============================
-// Progress
-// ===============================
-
-function renderProgressBar(data) {
-  if (!progressBar) return;
-
-  if (data.length === 0) {
-    progressBar.style.width = "0%";
-
-    return;
-  }
-
-  const done = data.filter((t) => t.status === "Done").length;
-
-  const percent = Math.round((done / data.length) * 100);
-
-  progressBar.style.width = `${percent}%`;
-}
-
-// ===============================
-// Table
-// ===============================
-
-function renderTable(data) {
-  taskList.innerHTML = "";
-
-  data.forEach((task) => {
-    const row = document.createElement("tr");
-
-    row.innerHTML = `
-
-        <td>
-        <strong>${task.name}</strong>
-        </td>
-
-
-        <td>
-        <span class="${getCategoryTagClass(task.category)}">
-        ${task.category}
-        </span>
-        </td>
-
-
-        <td>
-        <span class="badge badge-${task.priority.toLowerCase()}">
-        ${task.priority}
-        </span>
-        </td>
-
-
-        <td>
-        ${task.due_date || "—"}
-        </td>
-
-
-        <td>
-
-
-        <select onchange="updateTaskStatus(${task.id},this.value)">
-
-
-        <option ${task.status === "Todo" ? "selected" : ""}>
-        Todo
-        </option>
-
-
-        <option ${task.status === "In Progress" ? "selected" : ""}>
-        In Progress
-        </option>
-
-
-        <option ${task.status === "Done" ? "selected" : ""}>
-        Done
-        </option>
-
-
-        </select>
-
-
-        </td>
-
-
-
-        <td>
-
-
-        <button onclick="openEditModal(${task.id})">
-        ✏️
-        </button>
-
-
-        <button onclick="deleteTask(${task.id})">
-        🗑️
-        </button>
-
-
-        </td>
-
-
-        `;
-
-    taskList.appendChild(row);
-  });
-}
-
-// ===============================
-// Board View
-// ===============================
-
-function renderBoardView(data) {
-  const todo = document.getElementById("cardsTodo");
-
-  const progress = document.getElementById("cardsInProgress");
-
-  const done = document.getElementById("cardsDone");
-
-  todo.innerHTML = "";
-
-  progress.innerHTML = "";
-
-  done.innerHTML = "";
-
-  data.forEach((task) => {
-    const card = document.createElement("div");
-
-    card.className = "task-card";
-
-    card.dataset.id = task.id;
-
-    card.innerHTML = `
-
-<div>
-<strong>${task.name}</strong>
-</div>
-
-
-<div>
-${task.category}
-</div>
-
-
-<div>
-${task.priority}
-</div>
-
-
-<button onclick="openEditModal(${task.id})">
-✏️
-</button>
-
-
-<button onclick="deleteTask(${task.id})">
-🗑️
-</button>
-
-
-`;
-
-    if (task.status === "Todo") todo.appendChild(card);
-
-    if (task.status === "In Progress") progress.appendChild(card);
-
-    if (task.status === "Done") done.appendChild(card);
-  });
-
-  initDragAndDrop();
-}
-
-// ===============================
-// Drag Drop
-// ===============================
-
-function initDragAndDrop() {
-  sortableInstances.forEach((s) => s.destroy());
-
-  sortableInstances = [];
-
-  ["cardsTodo", "cardsInProgress", "cardsDone"].forEach((id) => {
-    const el = document.getElementById(id);
-
-    if (!el) return;
-
-    const sortable = new Sortable(el, {
-      group: "kanban",
-
-      animation: 150,
-
-      onEnd(evt) {
-        const taskId = Number(evt.item.dataset.id);
-
-        const status = evt.to.parentElement.dataset.status;
-
-        updateTaskStatus(taskId, status);
-      },
+async function addTask() {
+  const input = document.getElementById("taskInput");
+  const dueDateInput = document.getElementById("dueDateInput");
+  const addBtn = document.getElementById("addTaskBtn");
+  const name = input.value.trim();
+  if (!name) return;
+
+  const originalText = addBtn.textContent;
+  addBtn.disabled = true;
+  addBtn.textContent = "Adding...";
+
+  try {
+    const res = await authFetch(`${API_BASE}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, due_date: dueDateInput.value || null }),
     });
+    if (!res.ok) throw new Error();
 
-    sortableInstances.push(sortable);
-  });
+    input.value = "";
+    dueDateInput.value = "";
+    showToast("Task added", "success");
+    fetchTasks(document.getElementById("searchInput").value);
+  } catch (err) {
+    if (err.message !== "Session expired") {
+      showToast("Failed to add task. Please try again.");
+    }
+  } finally {
+    addBtn.disabled = false;
+    addBtn.textContent = originalText;
+  }
 }
 
 // ===============================
-// Sorting
+// Event Listeners
 // ===============================
 
-document.querySelectorAll(".sortable").forEach((header) => {
-  header.addEventListener("click", () => {
-    const column = header.dataset.sort;
-
-    if (currentSortColumn === column) {
-      currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
-    } else {
-      currentSortColumn = column;
-
-      currentSortDirection = "asc";
-    }
-
-    render();
-  });
+document.getElementById("addTaskBtn").addEventListener("click", addTask);
+document.getElementById("searchInput").addEventListener("input", (e) => {
+  fetchTasks(e.target.value);
+});
+document
+  .getElementById("authSubmitBtn")
+  .addEventListener("click", handleAuthSubmit);
+document.getElementById("logoutBtn").addEventListener("click", logout);
+document.getElementById("authToggleLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  isRegisterMode = !isRegisterMode;
+  updateAuthUI();
 });
 
-function sortTasks(data) {
-  if (!currentSortColumn) return data;
-
-  return [...data].sort((a, b) => {
-    let A = a[currentSortColumn] || "";
-
-    let B = b[currentSortColumn] || "";
-
-    if (currentSortColumn === "priority") {
-      const map = {
-        High: 3,
-        Medium: 2,
-        Low: 1,
-      };
-
-      A = map[A];
-
-      B = map[B];
-    }
-
-    if (A < B) return currentSortDirection === "asc" ? -1 : 1;
-
-    if (A > B) return currentSortDirection === "asc" ? 1 : -1;
-
-    return 0;
-  });
-}
-
-// ===============================
-// Filters
-// ===============================
-
-filterBtns.forEach((btn) => {
+document.querySelectorAll(".filter-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    filterBtns.forEach((b) => b.classList.remove("active"));
-
-    btn.classList.add("active");
-
     currentFilter = btn.dataset.filter;
-
-    render();
+    currentPage = 1;
+    document
+      .querySelectorAll(".filter-btn")
+      .forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    if (currentView === "board") {
+      renderBoard(applyFilter(allTasks));
+    } else {
+      renderTasks(applyFilter(allTasks));
+    }
   });
 });
 
-// ===============================
-// Search
-// ===============================
-
-searchInput?.addEventListener("input", render);
-
-// ===============================
-// Views
-// ===============================
-
-tableViewBtn?.addEventListener("click", () => {
-  currentView = "table";
-
-  tableViewBtn.classList.add("active");
-
-  boardViewBtn.classList.remove("active");
-
-  taskTable.style.display = "table";
-
-  boardView.style.display = "none";
-
-  render();
-});
-
-boardViewBtn?.addEventListener("click", () => {
-  currentView = "board";
-
-  boardViewBtn.classList.add("active");
-
-  tableViewBtn.classList.remove("active");
-
-  taskTable.style.display = "none";
-
-  boardView.style.display = "flex";
-
-  render();
-});
-
-// ===============================
-// Dark Mode
-// ===============================
-
-darkModeToggle?.addEventListener("click", () => {
-  document.body.classList.toggle("dark-mode");
-});
+document
+  .getElementById("tableViewBtn")
+  .addEventListener("click", () => switchView("table"));
+document
+  .getElementById("boardViewBtn")
+  .addEventListener("click", () => switchView("board"));
 
 // ===============================
 // Start Application
 // ===============================
 
-document.addEventListener("DOMContentLoaded", () => {
-  checkAuth();
-});
+if (getToken()) {
+  showApp();
+} else {
+  showAuth();
+}
