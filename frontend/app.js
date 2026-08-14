@@ -3,9 +3,12 @@
 // ===============================
 
 const API_BASE =
-  window.location.hostname === "localhost" ? "http://localhost:5000" : "/api";
+  window.location.hostname === "localhost"
+    ? "http://localhost:5000/api"
+    : "/api";
 const STATUSES = ["Todo", "In Progress", "Done"];
 const PAGE_SIZE = 10;
+const PRIORITY_WEIGHT = { High: 3, Medium: 2, Low: 1 };
 
 // ===============================
 // Global State
@@ -18,6 +21,9 @@ let currentPage = 1;
 let currentView = "table";
 let sortableInstances = [];
 let toastTimeout;
+let currentSortColumn = null;
+let currentSortDirection = "asc";
+let editingTaskId = null;
 
 // ===============================
 // Icons (pen / bin / restore)
@@ -48,7 +54,7 @@ function createEditButton(task) {
   btn.innerHTML = PEN_ICON_SVG;
   btn.title = "Edit task";
   btn.setAttribute("aria-label", "Edit task");
-  btn.onclick = () => editTask(task);
+  btn.onclick = () => openEditModal(task);
   return btn;
 }
 
@@ -73,6 +79,49 @@ function createRestoreButton(id) {
 }
 
 // ===============================
+// Badge / Tag Helpers
+// ===============================
+
+function createPriorityBadge(priority) {
+  const span = document.createElement("span");
+  const level = (priority || "Medium").toLowerCase();
+  span.className = `badge badge-${level}`;
+  span.textContent = priority || "Medium";
+  return span;
+}
+
+function getCategoryTagClass(category) {
+  const clean = (category || "general").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return `tag tag-${clean}`;
+}
+
+function createCategoryTag(category) {
+  const span = document.createElement("span");
+  span.className = getCategoryTagClass(category);
+  span.textContent = category || "General";
+  return span;
+}
+
+// ===============================
+// Due Date Helpers (overdue / due soon)
+// ===============================
+
+function getDueDateClass(task) {
+  if (!task.due_date || task.status === "Done") return "";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(task.due_date + "T00:00:00");
+
+  const diffMs = due - today;
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  if (diffDays < 0) return "overdue";
+  if (diffDays <= 2) return "due-soon";
+  return "";
+}
+
+// ===============================
 // Toast
 // ===============================
 
@@ -84,6 +133,30 @@ function showToast(message, type = "error") {
   toastTimeout = setTimeout(() => {
     toast.className = "";
   }, 3000);
+}
+
+// ===============================
+// Dark Mode
+// ===============================
+
+function initDarkMode() {
+  const enabled = localStorage.getItem("darkMode") === "true";
+  document.body.classList.toggle("dark-mode", enabled);
+  updateDarkModeButton();
+}
+
+function toggleDarkMode() {
+  const enabled = document.body.classList.toggle("dark-mode");
+  localStorage.setItem("darkMode", enabled ? "true" : "false");
+  updateDarkModeButton();
+}
+
+function updateDarkModeButton() {
+  const btn = document.getElementById("darkModeToggle");
+  if (!btn) return;
+  btn.textContent = document.body.classList.contains("dark-mode")
+    ? "☀️ Light Mode"
+    : "🌙 Dark Mode";
 }
 
 // ===============================
@@ -231,8 +304,7 @@ async function fetchTasks(search = "") {
     if (!res.ok) throw new Error("Failed to load tasks");
     allTasks = await res.json();
     currentPage = 1;
-    renderStats(allTasks);
-    renderTasks(applyFilter(allTasks));
+    render();
   } catch (err) {
     if (err.message !== "Session expired") {
       showToast("Could not load tasks. Please try again.");
@@ -241,12 +313,53 @@ async function fetchTasks(search = "") {
 }
 
 // ===============================
-// Filtering
+// Filtering / Sorting
 // ===============================
 
 function applyFilter(tasks) {
   if (currentFilter === "All") return tasks;
   return tasks.filter((t) => t.status === currentFilter);
+}
+
+function sortTasks(tasks) {
+  if (!currentSortColumn) return tasks;
+
+  return [...tasks].sort((a, b) => {
+    let A = a[currentSortColumn] ?? "";
+    let B = b[currentSortColumn] ?? "";
+
+    if (currentSortColumn === "priority") {
+      A = PRIORITY_WEIGHT[A] || 0;
+      B = PRIORITY_WEIGHT[B] || 0;
+    } else if (typeof A === "string") {
+      A = A.toLowerCase();
+      B = B.toLowerCase();
+    }
+
+    if (A < B) return currentSortDirection === "asc" ? -1 : 1;
+    if (A > B) return currentSortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function getVisibleTasks() {
+  return sortTasks(applyFilter(allTasks));
+}
+
+// ===============================
+// Render Orchestration
+// ===============================
+
+function render() {
+  renderStats(allTasks);
+  renderProgressBar(allTasks);
+
+  const visible = getVisibleTasks();
+  if (currentView === "board") {
+    renderBoard(visible);
+  } else {
+    renderTasks(visible);
+  }
 }
 
 // ===============================
@@ -268,6 +381,24 @@ function renderStats(tasks) {
 }
 
 // ===============================
+// Progress Bar
+// ===============================
+
+function renderProgressBar(tasks) {
+  const bar = document.getElementById("progressBar");
+  if (!bar) return;
+
+  if (tasks.length === 0) {
+    bar.style.width = "0%";
+    return;
+  }
+
+  const done = tasks.filter((t) => t.status === "Done").length;
+  const percent = Math.round((done / tasks.length) * 100);
+  bar.style.width = `${percent}%`;
+}
+
+// ===============================
 // Table View
 // ===============================
 
@@ -283,10 +414,20 @@ function renderTasks(tasks) {
 
   pageTasks.forEach((task) => {
     const tr = document.createElement("tr");
+    const dueClass = getDueDateClass(task);
+    if (dueClass) tr.classList.add(dueClass);
 
     const nameTd = document.createElement("td");
     nameTd.textContent = task.name;
     nameTd.setAttribute("data-label", "Task");
+
+    const categoryTd = document.createElement("td");
+    categoryTd.setAttribute("data-label", "Category");
+    categoryTd.appendChild(createCategoryTag(task.category));
+
+    const priorityTd = document.createElement("td");
+    priorityTd.setAttribute("data-label", "Priority");
+    priorityTd.appendChild(createPriorityBadge(task.priority));
 
     const dueTd = document.createElement("td");
     dueTd.textContent = task.due_date || "—";
@@ -316,6 +457,8 @@ function renderTasks(tasks) {
     actionsTd.appendChild(createDeleteButton(task.id, task.name));
 
     tr.appendChild(nameTd);
+    tr.appendChild(categoryTd);
+    tr.appendChild(priorityTd);
     tr.appendChild(dueTd);
     tr.appendChild(statusTd);
     tr.appendChild(actionsTd);
@@ -324,10 +467,38 @@ function renderTasks(tasks) {
   });
 
   renderPagination(tasks.length, totalPages);
+  updateSortIcons();
+}
 
-  if (currentView === "board") {
-    renderBoard(tasks);
-  }
+// ===============================
+// Sortable Column Headers
+// ===============================
+
+function updateSortIcons() {
+  document.querySelectorAll("th.sortable").forEach((th) => {
+    const icon = th.querySelector(".sort-icon");
+    if (!icon) return;
+    if (th.dataset.sort === currentSortColumn) {
+      icon.textContent = currentSortDirection === "asc" ? "↑" : "↓";
+    } else {
+      icon.textContent = "↕";
+    }
+  });
+}
+
+function initSortableHeaders() {
+  document.querySelectorAll("th.sortable").forEach((header) => {
+    header.addEventListener("click", () => {
+      const column = header.dataset.sort;
+      if (currentSortColumn === column) {
+        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        currentSortColumn = column;
+        currentSortDirection = "asc";
+      }
+      render();
+    });
+  });
 }
 
 // ===============================
@@ -345,7 +516,7 @@ function renderPagination(totalItems, totalPages) {
   prevBtn.disabled = currentPage === 1;
   prevBtn.onclick = () => {
     currentPage--;
-    renderTasks(applyFilter(allTasks));
+    renderTasks(getVisibleTasks());
   };
 
   const pageLabel = document.createElement("span");
@@ -356,7 +527,7 @@ function renderPagination(totalItems, totalPages) {
   nextBtn.disabled = currentPage === totalPages;
   nextBtn.onclick = () => {
     currentPage++;
-    renderTasks(applyFilter(allTasks));
+    renderTasks(getVisibleTasks());
   };
 
   bar.appendChild(prevBtn);
@@ -384,11 +555,18 @@ function renderBoard(tasks) {
 
     const card = document.createElement("div");
     card.className = "task-card";
+    const dueClass = getDueDateClass(task);
+    if (dueClass) card.classList.add(dueClass);
     card.dataset.taskId = task.id;
 
     const nameEl = document.createElement("div");
     nameEl.className = "card-name";
     nameEl.textContent = task.name;
+
+    const tagsEl = document.createElement("div");
+    tagsEl.className = "card-tags";
+    tagsEl.appendChild(createCategoryTag(task.category));
+    tagsEl.appendChild(createPriorityBadge(task.priority));
 
     const dueEl = document.createElement("div");
     dueEl.className = "card-due";
@@ -403,6 +581,7 @@ function renderBoard(tasks) {
     actionsEl.appendChild(createDeleteButton(task.id, task.name));
 
     card.appendChild(nameEl);
+    card.appendChild(tagsEl);
     card.appendChild(dueEl);
     card.appendChild(actionsEl);
 
@@ -457,44 +636,69 @@ function switchView(view) {
     paginationEl.style.display = "flex";
     document.getElementById("tableViewBtn").classList.add("active");
     document.getElementById("boardViewBtn").classList.remove("active");
-    renderTasks(applyFilter(allTasks));
   } else {
     tableEl.style.display = "none";
     boardEl.style.display = "flex";
     paginationEl.style.display = "none";
     document.getElementById("tableViewBtn").classList.remove("active");
     document.getElementById("boardViewBtn").classList.add("active");
-    renderBoard(applyFilter(allTasks));
   }
+
+  render();
 }
 
 // ===============================
-// Edit Task (prompt-based)
+// Edit Modal
 // ===============================
 
-function editTask(task) {
-  const newName = prompt("Edit task name:", task.name);
-  if (newName === null || newName.trim() === "") return;
+function openEditModal(task) {
+  editingTaskId = task.id;
+  document.getElementById("editTaskId").value = task.id;
+  document.getElementById("editTaskName").value = task.name;
+  document.getElementById("editDueDate").value = task.due_date || "";
+  document.getElementById("editPriority").value = task.priority || "Medium";
+  document.getElementById("editCategory").value = task.category || "General";
+  document.getElementById("editDescription").value = task.description || "";
+  document.getElementById("editModal").classList.add("show");
+}
 
-  const newDueDate = prompt(
-    "Edit due date (YYYY-MM-DD, leave blank for none):",
-    task.due_date || "",
+function closeEditModal() {
+  document.getElementById("editModal").classList.remove("show");
+  editingTaskId = null;
+}
+
+async function handleEditFormSubmit(e) {
+  e.preventDefault();
+
+  const name = document.getElementById("editTaskName").value.trim();
+  const due_date = document.getElementById("editDueDate").value || null;
+  const priority = document.getElementById("editPriority").value;
+  const category = document.getElementById("editCategory").value;
+  const description = document.getElementById("editDescription").value.trim();
+
+  if (!name) return;
+
+  await updateTask(
+    editingTaskId,
+    name,
+    due_date,
+    priority,
+    category,
+    description,
   );
-  if (newDueDate === null) return;
-
-  updateTask(task.id, newName.trim(), newDueDate.trim());
+  closeEditModal();
 }
 
 // ===============================
-// Update Task (name / due date)
+// Update Task
 // ===============================
 
-async function updateTask(id, name, due_date) {
+async function updateTask(id, name, due_date, priority, category, description) {
   try {
     const res = await authFetch(`${API_BASE}/tasks/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, due_date }),
+      body: JSON.stringify({ name, due_date, priority, category, description }),
     });
     if (!res.ok) throw new Error();
     showToast("Task updated", "success");
@@ -555,6 +759,8 @@ async function deleteTask(id, name) {
 async function addTask() {
   const input = document.getElementById("taskInput");
   const dueDateInput = document.getElementById("dueDateInput");
+  const priorityInput = document.getElementById("priorityInput");
+  const categoryInput = document.getElementById("categoryInput");
   const addBtn = document.getElementById("addTaskBtn");
   const name = input.value.trim();
   if (!name) return;
@@ -567,12 +773,19 @@ async function addTask() {
     const res = await authFetch(`${API_BASE}/tasks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, due_date: dueDateInput.value || null }),
+      body: JSON.stringify({
+        name,
+        due_date: dueDateInput.value || null,
+        priority: priorityInput ? priorityInput.value : "Medium",
+        category: categoryInput ? categoryInput.value : "General",
+      }),
     });
     if (!res.ok) throw new Error();
 
     input.value = "";
     dueDateInput.value = "";
+    if (priorityInput) priorityInput.value = "Medium";
+    if (categoryInput) categoryInput.value = "General";
     showToast("Task added", "success");
     fetchTasks(document.getElementById("searchInput").value);
   } catch (err) {
@@ -597,6 +810,9 @@ document
   .getElementById("authSubmitBtn")
   .addEventListener("click", handleAuthSubmit);
 document.getElementById("logoutBtn").addEventListener("click", logout);
+document
+  .getElementById("darkModeToggle")
+  .addEventListener("click", toggleDarkMode);
 document.getElementById("authToggleLink").addEventListener("click", (e) => {
   e.preventDefault();
   isRegisterMode = !isRegisterMode;
@@ -611,11 +827,7 @@ document.querySelectorAll(".filter-btn").forEach((btn) => {
       .querySelectorAll(".filter-btn")
       .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    if (currentView === "board") {
-      renderBoard(applyFilter(allTasks));
-    } else {
-      renderTasks(applyFilter(allTasks));
-    }
+    render();
   });
 });
 
@@ -626,9 +838,23 @@ document
   .getElementById("boardViewBtn")
   .addEventListener("click", () => switchView("board"));
 
+document
+  .getElementById("editTaskForm")
+  .addEventListener("submit", handleEditFormSubmit);
+document
+  .getElementById("closeModalBtn")
+  .addEventListener("click", closeEditModal);
+document.getElementById("editModal").addEventListener("click", (e) => {
+  if (e.target.id === "editModal") closeEditModal();
+});
+
+initSortableHeaders();
+
 // ===============================
 // Start Application
 // ===============================
+
+initDarkMode();
 
 if (getToken()) {
   showApp();

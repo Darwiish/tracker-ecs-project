@@ -41,7 +41,7 @@
         <h1>DevOps Project Tracker</h1>
       </div>
 
-      <!-- Auth section: Login & Registration -->
+      <!-- Auth section -->
       <div id="authSection">
         <h2 id="authTitle">Login</h2>
         <input type="email" id="authEmail" placeholder="Email" />
@@ -54,7 +54,7 @@
         <p id="authError" class="error"></p>
       </div>
 
-      <!-- Main application dashboard -->
+      <!-- Main app -->
       <div id="appSection" style="display: none">
         <div class="user-bar">
           <div class="user-info">
@@ -81,14 +81,12 @@
             </svg>
             <span id="userEmailDisplay"></span>
           </div>
-          <!-- Dark mode toggle and logout controls -->
           <div class="user-actions">
             <button id="darkModeToggle" class="theme-btn">🌙 Dark Mode</button>
             <button id="logoutBtn">Logout</button>
           </div>
         </div>
 
-        <!-- Completion progress indicator -->
         <div class="progress-container">
           <div id="progressBar" class="progress-bar"></div>
         </div>
@@ -109,7 +107,6 @@
           <button id="boardViewBtn" class="view-btn">Board View</button>
         </div>
 
-        <!-- New Task Creation Form -->
         <div class="add-task">
           <input type="text" id="taskInput" placeholder="Task Name" />
           <input type="date" id="dueDateInput" />
@@ -138,7 +135,6 @@
         <h2>Current Tasks</h2>
         <input type="text" id="searchInput" placeholder="Search tasks..." />
 
-        <!-- Interactive sortable task table -->
         <table id="taskTable">
           <thead>
             <tr>
@@ -163,7 +159,6 @@
           <tbody id="taskList"></tbody>
         </table>
 
-        <!-- Drag-and-drop Kanban Board View -->
         <div id="boardView" class="board-view" style="display: none">
           <div class="board-column" data-status="Todo">
             <h3>Todo <span class="column-count" id="countTodo">0</span></h3>
@@ -186,12 +181,13 @@
       </div>
     </div>
 
-    <!-- Edit Task Modal Overlay -->
+    <!-- Edit Task Modal -->
     <div id="editModal" class="modal">
       <div class="modal-content">
         <h3>Edit Task Details</h3>
         <form id="editTaskForm">
           <input type="hidden" id="editTaskId" />
+
           <label for="editTaskName">Task Name</label>
           <input type="text" id="editTaskName" required />
 
@@ -217,6 +213,13 @@
             <option value="Terraform">Terraform</option>
             <option value="CI/CD">CI/CD</option>
           </select>
+
+          <label for="editDescription">Description</label>
+          <textarea
+            id="editDescription"
+            rows="4"
+            placeholder="Optional details..."
+          ></textarea>
 
           <div class="modal-actions">
             <button type="button" id="closeModalBtn" class="secondary-btn">

@@ -9,24 +9,18 @@ const VALID_PRIORITIES = ["Low", "Medium", "High"];
 
 router.use(authenticateToken);
 
+const TASK_COLUMNS = `
+    id, name, status, priority, category, description,
+    TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date
+`;
+
 // GET /tasks?search=term
 router.get("/", async (req, res) => {
   const { search } = req.query;
   const userId = req.user.id;
 
   try {
-    let query = `
-      SELECT 
-        id,
-        name,
-        status,
-        priority,
-        category,
-        TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date
-      FROM tasks
-      WHERE user_id = $1
-    `;
-
+    let query = `SELECT ${TASK_COLUMNS} FROM tasks WHERE user_id = $1`;
     const params = [userId];
 
     if (search) {
@@ -37,127 +31,87 @@ router.get("/", async (req, res) => {
     query += ` ORDER BY due_date ASC NULLS LAST, id ASC`;
 
     const result = await pool.query(query, params);
-
     res.json(result.rows);
   } catch (err) {
     console.error("GET TASKS ERROR:", err);
-
-    res.status(500).json({
-      message: "Server error",
-      error: err.message,
-      code: err.code,
-      detail: err.detail,
-    });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // POST /tasks
 router.post("/", async (req, res) => {
-  const { name, due_date, priority, category } = req.body;
+  const { name, due_date, priority, category, description } = req.body;
   const userId = req.user.id;
 
   if (!name) {
-    return res.status(400).json({
-      message: "Task name is required",
-    });
+    return res.status(400).json({ message: "Task name is required" });
   }
+
+  const finalPriority = VALID_PRIORITIES.includes(priority)
+    ? priority
+    : "Medium";
 
   try {
     const result = await pool.query(
-      `
-      INSERT INTO tasks 
-      (name, status, due_date, priority, category, user_id)
-      VALUES ($1,$2,$3,$4,$5,$6)
-      RETURNING 
-        id,
-        name,
-        status,
-        priority,
-        category,
-        TO_CHAR(due_date, 'YYYY-MM-DD') AS due_date
-      `,
+      `INSERT INTO tasks (name, status, due_date, priority, category, description, user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING ${TASK_COLUMNS}`,
       [
         name,
         "Todo",
         due_date || null,
-        priority || "Medium",
+        finalPriority,
         category || "General",
+        description || null,
         userId,
       ],
     );
-
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("CREATE TASK ERROR:", err);
-
-    res.status(500).json({
-      message: "Server error",
-      error: err.message,
-      code: err.code,
-      detail: err.detail,
-    });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // PUT /tasks/:id
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, due_date, priority, category } = req.body;
+  const { name, due_date, priority, category, description } = req.body;
   const userId = req.user.id;
 
   if (!name) {
-    return res.status(400).json({
-      message: "Task name is required",
-    });
+    return res.status(400).json({ message: "Task name is required" });
   }
+
+  const finalPriority = VALID_PRIORITIES.includes(priority)
+    ? priority
+    : "Medium";
 
   try {
     const result = await pool.query(
-      `
-      UPDATE tasks
-      SET
-        name=$1,
-        due_date=$2,
-        priority=$3,
-        category=$4
-      WHERE id=$5 AND user_id=$6
-      RETURNING
-        id,
-        name,
-        status,
-        priority,
-        category,
-        TO_CHAR(due_date,'YYYY-MM-DD') AS due_date
-      `,
+      `UPDATE tasks
+             SET name = $1, due_date = $2, priority = $3, category = $4, description = $5
+             WHERE id = $6 AND user_id = $7
+             RETURNING ${TASK_COLUMNS}`,
       [
         name,
         due_date || null,
-        priority || "Medium",
+        finalPriority,
         category || "General",
+        description || null,
         id,
         userId,
       ],
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({
-        message: "Task not found",
-      });
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    res.json({
-      message: "Task updated",
-      task: result.rows[0],
-    });
+    res.json({ message: "Task updated", task: result.rows[0] });
   } catch (err) {
     console.error("UPDATE TASK ERROR:", err);
-
-    res.status(500).json({
-      message: "Server error",
-      error: err.message,
-      code: err.code,
-      detail: err.detail,
-    });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -168,41 +122,23 @@ router.patch("/:id/status", async (req, res) => {
   const userId = req.user.id;
 
   if (!VALID_STATUSES.includes(status)) {
-    return res.status(400).json({
-      message: "Invalid status",
-    });
+    return res.status(400).json({ message: "Invalid status" });
   }
 
   try {
     const result = await pool.query(
-      `
-      UPDATE tasks
-      SET status=$1
-      WHERE id=$2 AND user_id=$3
-      RETURNING *
-      `,
+      `UPDATE tasks SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING ${TASK_COLUMNS}`,
       [status, id, userId],
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({
-        message: "Task not found",
-      });
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    res.json({
-      message: "Status updated",
-      task: result.rows[0],
-    });
+    res.json({ message: "Status updated", task: result.rows[0] });
   } catch (err) {
     console.error("STATUS UPDATE ERROR:", err);
-
-    res.status(500).json({
-      message: "Server error",
-      error: err.message,
-      code: err.code,
-      detail: err.detail,
-    });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -213,32 +149,18 @@ router.delete("/:id", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `
-      DELETE FROM tasks
-      WHERE id=$1 AND user_id=$2
-      RETURNING id
-      `,
+      "DELETE FROM tasks WHERE id = $1 AND user_id = $2 RETURNING id",
       [id, userId],
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({
-        message: "Task not found",
-      });
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    res.json({
-      message: "Task deleted",
-    });
+    res.json({ message: "Task deleted" });
   } catch (err) {
     console.error("DELETE TASK ERROR:", err);
-
-    res.status(500).json({
-      message: "Server error",
-      error: err.message,
-      code: err.code,
-      detail: err.detail,
-    });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
