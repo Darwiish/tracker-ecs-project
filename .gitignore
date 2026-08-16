@@ -1,30 +1,23 @@
-# ==========================================
 # Application & Local Dependencies
-# ==========================================
 node_modules/
 .env
 *.log
 session-manager-plugin.deb
 
-# ==========================================
 # Terraform State & Lock Files (CRITICAL)
-# ==========================================
 .terraform/
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
 .terraform.lock.hcl
 
-# ==========================================
 # Secret Keys & Variable Files (CRITICAL)
-# ==========================================
+
 *.pem
 terraform.tfvars
 *.auto.tfvars
 
-# ==========================================
 # OS & IDE Files
-# ==========================================
 .DS_Store
 Thumbs.db
 .vscode/
