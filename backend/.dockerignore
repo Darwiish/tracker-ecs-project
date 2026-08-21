@@ -5,3 +5,7 @@ Dockerfile
 .git
 .gitignore
 .env
+README.md
+*.md
+terraform
+screenshots

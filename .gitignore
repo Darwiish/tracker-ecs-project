@@ -9,7 +9,6 @@ session-manager-plugin.deb
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
-.terraform.lock.hcl
 
 # Secret Keys & Variable Files (CRITICAL)
 *.pem

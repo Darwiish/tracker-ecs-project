@@ -1,23 +1,23 @@
-# Base Node.js image (lightweight)
-FROM node:18-alpine  
+# Build dependencies
+FROM node:18-alpine AS builder
 
-# Working directory inside container
-WORKDIR /app  
+WORKDIR /app
 
-# Install wget for health checks
-RUN apk add --no-cache wget
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy package files (enables build caching)
-COPY package*.json ./  
+# Runtime
+FROM node:18-alpine
 
-# Install dependencies (clean, reproducible install from package-lock.json; skips dev dependencies like nodemon)
-RUN npm ci --production
+WORKDIR /app
 
-# Copy application source code
-COPY . .  
+COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+COPY server.js ./
+COPY db.js ./
+COPY routes ./routes
+COPY middleware ./middleware
 
-# Container listens on port 5000
-EXPOSE 5000  
+EXPOSE 5000
 
-# Start the application
 CMD ["node", "server.js"]

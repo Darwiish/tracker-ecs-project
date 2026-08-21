@@ -4,3 +4,6 @@ Dockerfile
 .dockerignore
 .git
 .gitignore
+.env
+*.md
+migrations
