@@ -1,0 +1,72 @@
+name: Application Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write # Enable AWS OIDC authentication
+  contents: read # Allow repository checkout
+  actions: write # Allow triggering the Terraform workflow
+
+jobs:
+  application:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: eu-north-1
+      AWS_ROLE_ARN: arn:aws:iam::224084343617:role/github-actions-ecs-deploy
+      ECR_BACKEND_REPO: tracker-backend
+      ECR_FRONTEND_REPO: tracker-frontend
+
+    steps:
+      # Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Authenticate without static AWS credentials
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Authenticate Docker with Amazon ECR
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Build and publish the backend image
+      - name: Build & Push Backend Docker Image
+        id: build-backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_BACKEND_REPO }}:${{ github.sha }}
+
+      # Build and publish the frontend image
+      - name: Build & Push Frontend Docker Image
+        id: build-frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_FRONTEND_REPO }}:${{ github.sha }}
+
+      # Trigger Terraform deployment with immutable image digests
+      - name: Trigger Terraform Deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKEND_DIGEST: ${{ steps.build-backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.build-frontend.outputs.digest }}
+        run: |
+          gh workflow run terraform.yml \
+            --ref main \
+            -f backend_image_digest="$BACKEND_DIGEST" \
+            -f frontend_image_digest="$FRONTEND_DIGEST"

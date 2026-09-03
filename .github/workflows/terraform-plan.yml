@@ -1,0 +1,81 @@
+name: Terraform Plan Pipeline
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # Enable AWS OIDC authentication
+  contents: read # Allow repository checkout
+
+jobs:
+  plan:
+    name: Validate, Lint & Plan
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: eu-north-1
+      AWS_ROLE_ARN: arn:aws:iam::224084343617:role/github-actions-ecs-deploy
+
+    steps:
+      # Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Authenticate without static AWS credentials
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Install the required Terraform version
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      # Check Terraform formatting
+      - name: Terraform Format Check
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      # Initialize Terraform and configure the backend
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      # Validate Terraform configuration
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      # Install TFLint
+      - name: Install TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      # Run Terraform linting
+      - name: TFLint
+        working-directory: terraform
+        run: |
+          tflint --init
+          tflint
+
+      # Scan Terraform configuration for security issues
+      - name: Terraform Security Scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_dir: terraform
+
+      # Create the Terraform plan
+      - name: Terraform Plan
+        working-directory: terraform
+        run: |
+          terraform plan \
+            -var="backend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000" \
+            -var="frontend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000"
