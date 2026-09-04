@@ -105,11 +105,12 @@ resource "aws_ecs_task_definition" "frontend" {
 
 # Run the backend tasks in private application subnets.
 resource "aws_ecs_service" "backend" {
-  name            = "${var.cluster_name}-backend"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.backend.arn
-  desired_count   = var.backend_desired_count
-  launch_type     = "FARGATE"
+  name                   = "${var.cluster_name}-backend"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.backend.arn
+  desired_count          = var.backend_desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
 
   load_balancer {
     target_group_arn = var.backend_target_group_arn

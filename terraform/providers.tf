@@ -1,5 +1,5 @@
+# Deploy resources in the configured AWS region.
 provider "aws" {
-  # Deploy resources in the configured AWS region.
   region = var.aws_region
 
   default_tags {
@@ -8,4 +8,9 @@ provider "aws" {
       Project   = "tracker"
     }
   }
+}
+
+# Manage DNS records through Cloudflare.
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }

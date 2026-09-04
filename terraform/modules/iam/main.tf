@@ -22,6 +22,28 @@ resource "aws_iam_role" "task" {
   assume_role_policy = data.aws_iam_policy_document.assume_ecs.json
 }
 
+# Allow ECS Exec to establish Systems Manager control and data channels.
+resource "aws_iam_role_policy" "task_exec" {
+  name = "${var.project_name}-ecs-task-exec"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Define permissions required to run ECS tasks.
 data "aws_iam_policy_document" "execution_permissions" {
   statement {

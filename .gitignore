@@ -9,6 +9,8 @@ session-manager-plugin.deb
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
+tfplan
+*.tfplan
 
 # Secret Keys & Variable Files (CRITICAL)
 *.pem
