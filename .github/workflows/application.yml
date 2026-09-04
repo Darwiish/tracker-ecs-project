@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: application-main
+  cancel-in-progress: true
+
 permissions:
   id-token: write # Enable AWS OIDC authentication
   contents: read # Allow repository checkout
