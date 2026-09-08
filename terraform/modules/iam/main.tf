@@ -77,3 +77,72 @@ resource "aws_iam_role_policy" "task_execution" {
   role   = aws_iam_role.task_execution.id
   policy = data.aws_iam_policy_document.execution_permissions.json
 }
+
+# Trust GitHub Actions through its OIDC identity provider.
+resource "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+
+  client_id_list = [
+    "sts.amazonaws.com",
+  ]
+}
+
+# Allow the application repository to assume the deployment role.
+data "aws_iam_policy_document" "github_actions_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:Darwiish/tracker-ecs-project:*"]
+    }
+  }
+}
+
+# Create the role assumed by GitHub Actions.
+resource "aws_iam_role" "github_actions" {
+  name               = "github-actions-ecs-deploy"
+  assume_role_policy = data.aws_iam_policy_document.github_actions_assume.json
+}
+
+# Allow GitHub Actions to authenticate and push application images to ECR.
+resource "aws_iam_role_policy" "github_actions_ecr" {
+  name = "${var.project_name}-github-actions-ecr"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:CompleteLayerUpload",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart"
+        ]
+        Resource = values(var.ecr_repository_arns)
+      }
+    ]
+  })
+}
