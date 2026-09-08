@@ -21,3 +21,9 @@ variable "secret_arns" {
   description = "Secrets Manager ARNs allowed for task injection."
   type        = list(string)
 }
+
+# Pass the Terraform state bucket ARN to the IAM module.
+variable "terraform_state_bucket_arn" {
+  description = "ARN of the S3 bucket storing Terraform state."
+  type        = string
+}

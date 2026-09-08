@@ -95,9 +95,10 @@ module "rds" {
 module "iam" {
   source = "./modules/iam"
 
-  project_name        = var.project_name
-  ecr_repository_arns = module.ecr.repository_arns
-  log_group_arns      = module.logs.log_group_arns
+  project_name               = var.project_name
+  ecr_repository_arns        = module.ecr.repository_arns
+  log_group_arns             = module.logs.log_group_arns
+  terraform_state_bucket_arn = "arn:aws:s3:::tracker-terraform-state-224084343617-eu-north-1"
 
   secret_arns = [
     module.rds.master_user_secret_arn,

@@ -103,11 +103,12 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-   condition {
-     test     = "StringEquals"
-     variable = "token.actions.githubusercontent.com:sub"
-       values = [
-    "repo:Darwiish@14542291/tracker-ecs-project@1312399984:ref:refs/heads/main"]
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values = [
+        "repo:Darwiish@14542291/tracker-ecs-project@1312399984:ref:refs/heads/main"
+      ]
     }
   }
 }
@@ -144,6 +145,34 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
            "ecr:UploadLayerPart"
         ]
         Resource = values(var.ecr_repository_arns)
+      }
+    ]
+  })
+}
+
+# Allow GitHub Actions to manage the Terraform state in S3.
+resource "aws_iam_role_policy" "github_actions_terraform_state" {
+  name = "${var.project_name}-github-actions-terraform-state"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = var.terraform_state_bucket_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${var.terraform_state_bucket_arn}/tracker/*"
       }
     ]
   })
