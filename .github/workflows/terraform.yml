@@ -24,6 +24,7 @@ jobs:
     env:
       AWS_REGION: eu-north-1
       AWS_ROLE_ARN: arn:aws:iam::224084343617:role/github-actions-ecs-deploy
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
     steps:
       # Checkout the repository
