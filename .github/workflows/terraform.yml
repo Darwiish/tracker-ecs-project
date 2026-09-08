@@ -12,6 +12,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: terraform-main
+  cancel-in-progress: true
+
 permissions:
   id-token: write # Enable AWS OIDC authentication
   contents: read # Allow repository checkout
