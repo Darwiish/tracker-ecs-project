@@ -103,10 +103,11 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    condition {
-      test     = "StringLike"
-      variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:Darwiish/tracker-ecs-project:*"]
+   condition {
+     test     = "StringEquals"
+     variable = "token.actions.githubusercontent.com:sub"
+       values = [
+    "repo:Darwiish@14542291/tracker-ecs-project@1312399984:ref:refs/heads/main"]
     }
   }
 }
