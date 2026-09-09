@@ -19,6 +19,9 @@ jobs:
     env:
       AWS_REGION: eu-north-1
       AWS_ROLE_ARN: arn:aws:iam::224084343617:role/github-actions-ecs-deploy
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      TF_VAR_database_username: tracker_admin
 
     steps:
       # Checkout the repository
@@ -72,7 +75,7 @@ jobs:
         with:
           working_dir: terraform
 
-      # Create the Terraform plan
+      # Create a validation plan without applying changes
       - name: Terraform Plan
         working-directory: terraform
         run: |

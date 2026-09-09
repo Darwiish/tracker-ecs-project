@@ -89,11 +89,11 @@ variable "database_name" {
   default     = "project_tracker"
 }
 
-# PostgreSQL master username.
+# Master username for the RDS database.
 variable "database_username" {
   description = "RDS master username."
   type        = string
-  default     = "postgres"
+  default     = "tracker_admin"
 }
 
 # RDS instance class.
