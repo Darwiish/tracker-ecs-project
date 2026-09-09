@@ -74,6 +74,7 @@ jobs:
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           working_dir: terraform
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # Create a validation plan without applying changes
       - name: Terraform Plan
