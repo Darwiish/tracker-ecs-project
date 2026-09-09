@@ -73,7 +73,7 @@ jobs:
       - name: Terraform Security Scan
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          working_dir: terraform
+          working_directory: terraform
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # Create a validation plan without applying changes
