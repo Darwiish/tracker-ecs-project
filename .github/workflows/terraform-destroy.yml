@@ -52,6 +52,19 @@ jobs:
         working-directory: terraform
         run: terraform init
 
+      # Validate Terraform configuration
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      # Scan Terraform configuration for security issues
+      - name: Terraform Security Scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          additional_args: --minimum-severity HIGH
+
       # Destroy the Terraform-managed infrastructure
       - name: Terraform Destroy
         working-directory: terraform
