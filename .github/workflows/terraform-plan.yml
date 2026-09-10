@@ -75,6 +75,7 @@ jobs:
         with:
           working_directory: terraform
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          additional_args: --minimum-severity HIGH
 
       # Create a validation plan without applying changes
       - name: Terraform Plan
