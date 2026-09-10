@@ -1,10 +1,12 @@
 # Create the public application load balancer.
 resource "aws_lb" "main" {
-  name               = "${var.project_name}-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [var.alb_security_group_id]
-  subnets            = var.public_subnet_ids
+  name                       = "${var.project_name}-alb"
+  internal                   = false
+  load_balancer_type         = "application"
+  security_groups            = [var.alb_security_group_id]
+  subnets                    = var.public_subnet_ids
+  drop_invalid_header_fields = true
+
 }
 
 # Route API traffic to the backend ECS tasks.
