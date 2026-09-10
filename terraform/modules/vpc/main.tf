@@ -28,7 +28,8 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Public subnets provide internet facing network placement.
+# Public subnets host the internet-facing ALB.
+#tfsec:ignore:aws-ec2-no-public-ip-subnet
 resource "aws_subnet" "public" {
   count = var.availability_zone_count
 

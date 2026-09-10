@@ -1,4 +1,5 @@
-# Create the public application load balancer.
+# Public ALB is the internet-facing entry point behind Cloudflare.
+#tfsec:ignore:aws-elb-alb-not-public
 resource "aws_lb" "main" {
   name                       = "${var.project_name}-alb"
   internal                   = false
@@ -6,7 +7,6 @@ resource "aws_lb" "main" {
   security_groups            = [var.alb_security_group_id]
   subnets                    = var.public_subnet_ids
   drop_invalid_header_fields = true
-
 }
 
 # Route API traffic to the backend ECS tasks.

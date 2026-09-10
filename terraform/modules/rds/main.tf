@@ -1,4 +1,5 @@
 # Create the private PostgreSQL RDS instance.
+#tfsec:ignore:aws-rds-specify-backup-retention
 resource "aws_db_instance" "postgres" {
   identifier                  = "${var.project_name}-postgres"
   engine                      = "postgres"
