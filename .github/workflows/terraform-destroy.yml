@@ -65,7 +65,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           additional_args: --minimum-severity HIGH
 
-      # Destroy the Terraform-managed infrastructure
+      # Supply valid digest values required during variable validation
       - name: Terraform Destroy
         working-directory: terraform
-        run: terraform destroy -auto-approve
+        run: |
+          terraform destroy -auto-approve \
+            -var="backend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000" \
+            -var="frontend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000"
