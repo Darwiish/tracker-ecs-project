@@ -29,7 +29,6 @@ jobs:
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
-        continue-on-error: true
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -41,16 +40,15 @@ jobs:
 
       - name: Terraform Init
         working-directory: terraform
-        continue-on-error: true
         run: terraform init -input=false
 
       - name: Terraform Validate
         working-directory: terraform
-        continue-on-error: true
         run: terraform validate -no-color
 
       - name: Terraform Destroy
         working-directory: terraform
         run: |
-          echo "AWS resources have already been fully wiped."
-          echo "Destroy complete! Resources: 0 destroyed."
+          terraform destroy -auto-approve \
+            -var="backend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000" \
+            -var="frontend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000"
