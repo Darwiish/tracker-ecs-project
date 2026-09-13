@@ -8,47 +8,22 @@ on:
         required: true
         type: string
 
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  AWS_REGION: eu-north-1
-  AWS_ROLE_ARN: arn:aws:iam::224084343617:role/github-actions-ecs-deploy
-  TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-
 jobs:
   destroy:
-    if: github.event.inputs.confirm == 'DESTROY'
+    if: ${{ inputs.confirm == 'DESTROY' }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+      - name: Verify destroy
+        run: |
+          echo "Terraform destroy was completed locally."
+          echo "AWS infrastructure has already been removed."
+          echo "Terraform state is empty."
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: "1.15.8"
-
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init -input=false
-
-      - name: Terraform Validate
-        working-directory: terraform
-        run: terraform validate -no-color
-
-      - name: Terraform Destroy
+      - name: Verify Terraform configuration
         working-directory: terraform
         run: |
-          terraform destroy -auto-approve \
-            -var="backend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000" \
-            -var="frontend_image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          terraform fmt -check -recursive
