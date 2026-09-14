@@ -108,7 +108,20 @@ VPC
   - RDS PostgreSQL
 ```
 
-The private application and database route tables do not carry a default internet route.
+The private application and database route tables do not carry a
+default internet route.
+
+VPC Endpoints
+
+The VPC uses endpoints for AWS services required by private resources, including:
+
+- Amazon ECR API
+- Amazon ECR Docker Registry
+- Amazon S3
+- AWS Secrets Manager
+- CloudWatch Logs
+
+This allows private ECS resources to communicate with required AWS services without introducing a NAT Gateway. This was an intentional cost and architecture decision.
 
 ### ECS Fargate
 
@@ -154,18 +167,6 @@ The application connects to PostgreSQL over the private VPC network.
 Amazon ECR stores the frontend and backend container images in two separate repositories: `tracker-frontend` and `tracker-backend`.
 
 The deployment process uses immutable image digests rather than relying on a mutable `latest` tag for ECS deployments. This means an ECS task definition references the exact container image that was built and published by CI/CD.
-
-### VPC endpoints
-
-The VPC uses endpoints for AWS services required by private resources, including:
-
-- Amazon ECR API
-- Amazon ECR Docker Registry
-- Amazon S3
-- AWS Secrets Manager
-- CloudWatch Logs
-
-This allows private ECS resources to communicate with required AWS services without introducing a NAT Gateway. This was an intentional cost and architecture decision.
 
 ## Terraform
 
@@ -439,7 +440,7 @@ The folders contain screenshots captured during development, deployment, testing
 
 ![Destroy Workflow](screenshots/cicd/destroy.png)
 
-Historical AWS screenshots represent the environment during deployment and testing. They should not be interpreted as proof that the AWS environment is currently running.
+AWS screenshots represent the environment during deployment and testing. They should not be interpreted as proof that the AWS environment is currently running.
 
 ## Key design decisions
 
