@@ -267,7 +267,7 @@ Applies the infrastructure configuration using the image digests passed in from 
 
 ### Terraform destroy workflow
 
-Manually triggered only, and requires typing an explicit confirmation value before running — an additional safeguard against accidental destruction of the AWS environment.
+Manually triggered only, and requires typing an explicit confirmation value before running an additional safeguard against accidental destruction of the AWS environment.
 
 ## AWS authentication
 
