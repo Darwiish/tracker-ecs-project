@@ -315,7 +315,7 @@ Where the Terraform code contains a deliberate `tfsec` ignore, the reason is doc
 
 ## Project structure
 
-```text
+````text
 tracker-ecs-project/
 ├── .github/
 │   └── workflows/
@@ -324,9 +324,10 @@ tracker-ecs-project/
 ├── migrations/
 ├── bootstrap/
 ├── terraform/
+│   └── modules/
 ├── docker-compose.yml
 └── README.md
-```
+
 
 | Directory            | Purpose                                    |
 | -------------------- | ------------------------------------------ |
@@ -343,7 +344,7 @@ Start the local environment with:
 
 ```bash
 docker compose up --build
-```
+````
 
 Docker Compose provides the local application services: frontend, backend API, and PostgreSQL. Exact ports, environment variables, volumes, and service configuration are defined in `docker-compose.yml`.
 
