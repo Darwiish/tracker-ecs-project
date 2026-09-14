@@ -2,92 +2,59 @@
 
 A full-stack task and project tracker built as a DevOps capstone project.
 
-The application provides a practical workload for demonstrating containerization, AWS networking, ECS Fargate, PostgreSQL, Application Load Balancing, Infrastructure as Code with Terraform, CI/CD with GitHub Actions, security scanning, secrets management, and immutable container deployments.
+The project demonstrates containerization, AWS networking, ECS Fargate, PostgreSQL, Application Load Balancing, Terraform Infrastructure as Code, GitHub Actions CI/CD, security scanning, secrets management, and immutable container deployments.
 
-The AWS environment was successfully deployed and tested, then intentionally destroyed to avoid ongoing AWS costs. This repository therefore documents and contains the configuration for the deployment; it does not mean that the AWS environment is currently running.
+The AWS environment has been deployed and verified, including live registration and login testing against the production domain. Because the infrastructure can be destroyed to control costs, check the current AWS state rather than assuming the environment is running.
 
 ## What is this application?
 
-The project is a task and project management application with a React frontend, Node.js backend API, and PostgreSQL database.
+The project is a task and project management application with a vanilla HTML/CSS/JavaScript frontend, a Node.js/Express backend API, and a PostgreSQL database.
 
 The application supports:
 
-- User authentication
+- User authentication (register/login/logout)
 - JWT-based stateless authentication
-- Password hashing
+- bcrypt password hashing
 - Task creation, editing, and deletion
-- Task priorities
-- Categories
-- Task descriptions
-- Task status management
-- Kanban board
-- List/table views
+- Task priorities (Low / Medium / High)
+- Categories (Backend, Frontend, Database, AWS, Networking, Docker, Terraform, CI/CD, General)
+- Task descriptions, edited via a modal dialog
+- Task status management (Todo / In Progress / Done)
+- Kanban board view with drag-and-drop
+- Sortable list/table view
 - Search and filtering
 - Pagination
-- Statistics and progress information
+- Statistics and a completion progress bar
 - Dark mode
-- Due dates and overdue task handling
+- Due dates, with overdue and due-soon highlighting
 
 The application itself is intentionally straightforward. The main purpose of the project is to demonstrate how a full-stack application can be containerized, deployed, secured, monitored, and managed using modern DevOps practices.
 
 ## Tech stack
 
-| Area                   | Technology                |
-| ---------------------- | ------------------------- |
-| Frontend               | React / TypeScript        |
-| Backend                | Node.js API               |
-| Database               | PostgreSQL                |
-| Containerization       | Docker / Docker Compose   |
-| Container registry     | Amazon ECR                |
-| Container platform     | Amazon ECS Fargate        |
-| Load balancing         | Application Load Balancer |
-| Database hosting       | Amazon RDS for PostgreSQL |
-| Infrastructure as Code | Terraform                 |
-| CI/CD                  | GitHub Actions            |
-| AWS authentication     | GitHub OIDC               |
-| Secrets                | AWS Secrets Manager       |
-| DNS / Edge             | Cloudflare                |
-| TLS                    | ACM / Cloudflare          |
-| Security scanning      | TFLint / tfsec            |
+| Area                   | Technology                                  |
+| ---------------------- | ------------------------------------------- |
+| Frontend               | Vanilla HTML / CSS / JavaScript, SortableJS |
+| Backend                | Node.js / Express API                       |
+| Database               | PostgreSQL 16                               |
+| Containerization       | Docker / Docker Compose                     |
+| Container registry     | Amazon ECR                                  |
+| Container platform     | Amazon ECS Fargate                          |
+| Load balancing         | Application Load Balancer                   |
+| Database hosting       | Amazon RDS for PostgreSQL                   |
+| Infrastructure as Code | Terraform                                   |
+| CI/CD                  | GitHub Actions                              |
+| AWS authentication     | GitHub OIDC                                 |
+| Secrets                | AWS Secrets Manager                         |
+| DNS / Edge             | Cloudflare                                  |
+| TLS                    | ACM (validated via Cloudflare DNS records)  |
+| Security scanning      | TFLint / tfsec                              |
 
 ## Architecture
 
-The deployed AWS architecture follows a public-edge/private-application design:
+The deployed AWS architecture follows a public-edge/private-application design.
 
-```text
-                         Internet
-                            |
-                            v
-                        Cloudflare
-                            |
-                          HTTPS
-                            |
-                            v
-                Application Load Balancer
-                    Public Subnets
-                            |
-              +-------------+-------------+
-              |                           |
-          /* traffic                  /api/* traffic
-              |                           |
-              v                           v
-     Frontend ECS Service         Backend ECS Service
-          Fargate                      Fargate
-     Private App Subnets          Private App Subnets
-                                          |
-                                          |
-                                          v
-                                  RDS PostgreSQL
-                                  Private DB Subnets
-
-
-        VPC Endpoints
-              |
-              +---- ECR
-              +---- S3
-              +---- Secrets Manager
-              +---- CloudWatch Logs
-```
+![AWS ECS Fargate Architecture](screenshots/aws/aws-architecture.png)
 
 The important networking boundary is:
 
@@ -100,7 +67,11 @@ The important networking boundary is:
 - VPC endpoints provide private access to required AWS services.
 - No NAT Gateway is required for the application's AWS service access pattern.
 
-The deployed VPC uses multiple Availability Zones for the public, application, and database subnet layers.
+The deployed VPC uses two Availability Zones across the public, application, and database subnet layers.
+
+## Demo
+
+[Watch the ECS project demo](videos/ecs-project.wmv)
 
 ## Request routing
 
@@ -113,9 +84,9 @@ https://<domain>/api/*  -> Backend ECS service
 https://<domain>/*      -> Frontend ECS service
 ```
 
-This keeps the backend private while allowing the frontend and API to share the same public application entry point.
+This keeps the backend tasks private while allowing the frontend and API to share the same public application entry point.
 
-Cloudflare is used for DNS and edge/TLS configuration, while the AWS ALB handles application traffic into the VPC.
+Cloudflare is used for DNS and edge configuration, while the AWS ALB handles HTTPS termination and application traffic into the VPC.
 
 ## AWS infrastructure
 
@@ -125,31 +96,23 @@ The Terraform configuration creates a dedicated VPC with separate subnet layers:
 
 ```text
 VPC
-|
-+-- Public subnets
-|     |
-|     +-- Application Load Balancer
-|
-+-- Private application subnets
-|     |
-|     +-- Frontend ECS
-|     +-- Backend ECS
-|
-+-- Private database subnets
-      |
-      +-- RDS PostgreSQL
+
+- Public subnets
+  - Application Load Balancer
+
+- Private application subnets
+  - Frontend ECS
+  - Backend ECS
+
+- Private database subnets
+  - RDS PostgreSQL
 ```
 
-The private application and database route tables do not require a default internet route.
+The private application and database route tables do not carry a default internet route.
 
 ### ECS Fargate
 
-The application runs on Amazon ECS using Fargate.
-
-The deployment contains separate services for:
-
-- Frontend
-- Backend
+The application runs on Amazon ECS using Fargate, with separate services for the frontend and backend.
 
 The ECS tasks:
 
@@ -158,17 +121,15 @@ The ECS tasks:
 - Pull container images from ECR
 - Send container logs to CloudWatch Logs
 - Use security groups to control network access
-- Receive application configuration through environment variables and secrets
+- Receive application configuration through environment variables and Secrets Manager secrets
 
 ### Application Load Balancer
 
-The ALB is the public entry point into the VPC.
-
-The Terraform configuration provides:
+The ALB is the public entry point into the VPC. The Terraform configuration provides:
 
 - Internet-facing ALB
 - HTTPS listener
-- HTTP-to-HTTPS redirection where configured
+- HTTP-to-HTTPS redirection
 - Frontend target group
 - Backend target group
 - Path-based routing
@@ -176,40 +137,27 @@ The Terraform configuration provides:
 
 ### RDS PostgreSQL
 
-PostgreSQL is hosted using Amazon RDS.
-
-The database:
+PostgreSQL is hosted using Amazon RDS. The database:
 
 - Runs in private database subnets
 - Is not publicly accessible
 - Uses a dedicated DB subnet group
 - Uses security-group controlled access
 - Uses encrypted storage
-- Uses AWS-managed password handling where configured
+- Uses an AWS-managed master password stored in Secrets Manager
 - Is separated from the ECS application tier through the VPC network design
 
 The application connects to PostgreSQL over the private VPC network.
 
 ### ECR
 
-Amazon ECR stores the frontend and backend container images.
+Amazon ECR stores the frontend and backend container images in two separate repositories: `tracker-frontend` and `tracker-backend`.
 
-Separate repositories are used for the two application components:
-
-```text
-tracker-frontend
-tracker-backend
-```
-
-The deployment process uses immutable image digests rather than relying on a mutable `latest` tag for ECS deployments.
-
-This means an ECS task definition references the exact container image that was built and published by CI/CD.
+The deployment process uses immutable image digests rather than relying on a mutable `latest` tag for ECS deployments. This means an ECS task definition references the exact container image that was built and published by CI/CD.
 
 ### VPC endpoints
 
-The VPC uses endpoints for AWS services required by private resources.
-
-The design includes endpoints for services such as:
+The VPC uses endpoints for AWS services required by private resources, including:
 
 - Amazon ECR API
 - Amazon ECR Docker Registry
@@ -217,31 +165,23 @@ The design includes endpoints for services such as:
 - AWS Secrets Manager
 - CloudWatch Logs
 
-This allows private ECS resources to communicate with required AWS services without introducing a NAT Gateway.
-
-This was an intentional cost and architecture decision.
+This allows private ECS resources to communicate with required AWS services without introducing a NAT Gateway. This was an intentional cost and architecture decision.
 
 ## Terraform
 
-The infrastructure is defined as code under:
+The infrastructure is defined as code under `terraform/`.
 
-```text
-terraform/
-```
-
-The Terraform project is modular and separates infrastructure responsibilities into reusable components.
-
-The repository contains Terraform configuration for areas including:
+The Terraform project is modular and separates infrastructure responsibilities into reusable components, covering:
 
 - VPC networking
 - Security groups
 - VPC endpoints
 - ECR
 - ACM
-- Cloudflare
+- Cloudflare (DNS validation and application DNS records)
 - RDS
 - Secrets Manager
-- IAM
+- IAM (including GitHub OIDC federation)
 - CloudWatch Logs
 - ALB
 - ECS
@@ -250,9 +190,7 @@ The exact implementation and module configuration are defined in the Terraform s
 
 ## Terraform remote state
 
-Terraform state is stored remotely in Amazon S3.
-
-The repository separates the Terraform backend bootstrap from the main application infrastructure:
+Terraform state is stored remotely in Amazon S3. The repository separates the Terraform backend bootstrap from the main application infrastructure:
 
 ```text
 bootstrap/
@@ -262,26 +200,22 @@ terraform/
     Main AWS application infrastructure
 ```
 
-The bootstrap configuration creates and configures the S3 bucket used for Terraform state.
-
-The main Terraform configuration uses a separate state key within that backend.
+The bootstrap configuration creates and configures the S3 bucket used for Terraform state. The main Terraform configuration uses a separate state key (`tracker/terraform.tfstate`) within that same backend, while the bootstrap state lives under `bootstrap/terraform.tfstate`.
 
 The state bucket uses security-focused configuration including:
 
 - Versioning
 - Public access blocking
 - Bucket-owner-enforced object ownership
-- Encryption
-- TLS-only access
-- Native S3 state locking where configured
+- Server-side encryption
+- TLS-only access (deny policy on insecure transport)
+- Native S3 state locking (`use_lockfile = true`)
 
-The `bootstrap/README.md` contains the specific bootstrap and state migration instructions.
+`bootstrap/README.md` contains the specific bootstrap and state migration instructions.
 
 ## CI/CD
 
-GitHub Actions manages the application and infrastructure workflows.
-
-The repository contains these workflows:
+GitHub Actions manages the application and infrastructure workflows:
 
 ```text
 .github/workflows/
@@ -293,37 +227,9 @@ The repository contains these workflows:
 
 ### Application workflow
 
-The application workflow builds and publishes the frontend and backend container images.
-
-The deployment flow is:
-
-```text
-Git push
-   |
-   v
-GitHub Actions
-   |
-   +-- Build frontend image
-   +-- Build backend image
-   |
-   v
-Amazon ECR
-   |
-   v
-Capture image digests
-   |
-   v
-Terraform deployment
-   |
-   v
-ECS task definitions/services
-```
+Builds the frontend and backend images, pushes both to Amazon ECR, captures the SHA-256 digest for each image, and passes those digests to the Terraform deployment workflow.
 
 ### Immutable deployments
-
-The deployment uses image digests rather than depending on a mutable image tag.
-
-Conceptually:
 
 ```text
 Docker image
@@ -345,34 +251,26 @@ This makes deployments reproducible and ensures that ECS references the exact im
 
 ### Terraform plan workflow
 
-Pull requests that change Terraform configuration are validated using:
+Runs on pull requests that change Terraform configuration:
 
-- Terraform formatting checks
-- Terraform initialization
-- Terraform validation
+- Terraform formatting check
+- Terraform init
+- Terraform validate
 - TFLint
-- tfsec
-- Terraform plan
-
-The plan workflow is designed to identify infrastructure and security issues before changes are applied.
+- tfsec (minimum severity HIGH)
+- Terraform plan (dry run)
 
 ### Terraform apply workflow
 
-The Terraform deployment workflow applies the infrastructure configuration and passes the application image digests into the deployment.
+Applies the infrastructure configuration using the image digests passed in from the application workflow. When the image digest changes, Terraform creates a new ECS task-definition revision.
 
 ### Terraform destroy workflow
 
-Infrastructure destruction is available through a manually triggered GitHub Actions workflow.
-
-The destroy workflow requires an explicit confirmation value before running.
-
-This provides an additional safeguard against accidental destruction of the AWS environment.
+Manually triggered only, and requires typing an explicit confirmation value before running — an additional safeguard against accidental destruction of the AWS environment.
 
 ## AWS authentication
 
-GitHub Actions uses AWS OIDC authentication rather than storing long-lived AWS access keys in GitHub secrets.
-
-The general flow is:
+GitHub Actions uses AWS OIDC authentication rather than storing long-lived AWS access keys in GitHub secrets:
 
 ```text
 GitHub Actions
@@ -388,60 +286,31 @@ Deployment role
 AWS resources
 ```
 
-The IAM trust policy restricts which GitHub repository/workflow context can assume the deployment role.
-
-This removes the need to maintain permanent AWS access keys for CI/CD.
+The IAM trust policy restricts which GitHub repository and branch can assume the deployment role, removing the need to maintain permanent AWS access keys for CI/CD.
 
 ## Security
 
-Security is implemented at multiple layers.
-
 ### Network security
 
-- ALB is the public entry point.
-- ECS tasks run in private subnets.
-- RDS runs in private database subnets.
-- Security groups restrict traffic between tiers.
-- RDS is not publicly accessible.
-- ECS tasks do not receive public IP addresses.
-- Private route tables avoid unnecessary internet access.
+- ALB is the public entry point
+- ECS tasks run in private subnets with no public IP addresses
+- RDS runs in private database subnets and is not publicly accessible
+- Security groups restrict traffic between tiers
+- Private route tables avoid unnecessary internet access
 
 ### Secrets
 
-Application secrets are not committed to the repository.
-
-AWS Secrets Manager is used for sensitive configuration where required by the deployment.
-
-RDS password management is handled using AWS-managed mechanisms where configured.
+Application secrets are not committed to the repository. AWS Secrets Manager holds the JWT signing secret, while the RDS master password is managed by AWS through Secrets Manager rather than being stored in Terraform configuration or `.tfvars` files.
 
 ### Container images
 
-Frontend and backend images are stored in ECR.
-
-Deployments use immutable image digests so that an ECS deployment is tied to a specific image.
+Deployments use immutable image digests so that an ECS deployment is tied to a specific, known image rather than a mutable tag.
 
 ### CI/CD security
 
-GitHub Actions uses OIDC authentication for AWS access.
+GitHub Actions uses OIDC authentication for AWS access. Terraform security checks (`terraform fmt -check`, `terraform validate`, `tflint`, and `tfsec` at minimum severity HIGH) run as part of pull requests that modify Terraform code.
 
-Terraform security checks are also executed as part of CI/CD.
-
-## Infrastructure security scanning
-
-Terraform configuration is checked using:
-
-```text
-terraform fmt -check
-terraform validate
-tflint
-tfsec
-```
-
-The security workflow uses tfsec with a minimum severity of HIGH.
-
-This means HIGH and CRITICAL findings can block the pipeline, while lower-severity findings remain visible for review.
-
-Where the Terraform code contains a deliberate `tfsec` ignore, the reason should be understood from the surrounding Terraform configuration rather than treated as an accidental bypass.
+Where the Terraform code contains a deliberate `tfsec` ignore, the reason is documented inline in the surrounding Terraform configuration rather than being an unexplained bypass.
 
 ## Project structure
 
@@ -455,31 +324,19 @@ tracker-ecs-project/
 ├── bootstrap/
 ├── terraform/
 ├── docker-compose.yml
-├── .tflint.hcl
-├── README.md
-└── screenshots/
-    ├── application/
-    ├── docker/
-    ├── aws/
-    ├── terraform/
-    └── cicd/
+└── README.md
 ```
-
-### Main directories
 
 | Directory            | Purpose                                    |
 | -------------------- | ------------------------------------------ |
-| `frontend/`          | Frontend application                       |
+| `frontend/`          | Frontend application (vanilla HTML/CSS/JS) |
 | `backend/`           | Backend API                                |
 | `migrations/`        | PostgreSQL database migrations             |
 | `bootstrap/`         | Terraform backend bootstrap                |
 | `terraform/`         | Main AWS infrastructure                    |
 | `.github/workflows/` | CI/CD workflows                            |
-| `screenshots/`       | Project evidence and portfolio screenshots |
 
 ## Local development
-
-The application can be run locally using Docker Compose.
 
 Start the local environment with:
 
@@ -487,17 +344,9 @@ Start the local environment with:
 docker compose up --build
 ```
 
-Docker Compose provides the local application services, including:
-
-- Frontend
-- Backend API
-- PostgreSQL
-
-The exact ports, environment variables, volumes, and service configuration are defined in `docker-compose.yml`.
+Docker Compose provides the local application services: frontend, backend API, and PostgreSQL. Exact ports, environment variables, volumes, and service configuration are defined in `docker-compose.yml`.
 
 ## Deployment lifecycle
-
-The overall infrastructure lifecycle is:
 
 ```text
 1. Bootstrap Terraform state
@@ -524,204 +373,96 @@ The overall infrastructure lifecycle is:
 8. Destroy infrastructure when testing is complete
 ```
 
-The infrastructure was deployed and tested as part of the project.
-
-After validation, the AWS resources were intentionally destroyed to avoid unnecessary ongoing costs.
-
 ## Cost considerations
 
-Cost control was an important part of the infrastructure design.
+Cost control was an important part of the infrastructure design:
 
-The project avoids a NAT Gateway and instead uses VPC endpoints for required AWS service connectivity from private resources.
-
-Other cost considerations include:
-
-- ECS Fargate compute costs
-- Application Load Balancer costs
-- RDS costs
+- No NAT Gateway — VPC endpoints are used instead for required AWS service connectivity from private resources
+- ECS Fargate compute cost, billed per running task
+- Application Load Balancer hourly and LCU costs
+- RDS instance cost (`db.t3.micro`, single-AZ)
 - ECR storage
 - CloudWatch Logs
-- VPC endpoint costs
+- VPC endpoint costs (interface endpoints bill hourly; the S3 gateway endpoint is free)
 
-Because this is a learning and portfolio project, the AWS infrastructure was destroyed after testing rather than being left running continuously.
+Because this is a learning and portfolio project, the `terraform-destroy` GitHub Actions workflow provides a controlled, confirmation-gated way to remove the main infrastructure whenever it is not actively needed, helping avoid unnecessary ongoing costs.
 
-The Terraform destroy workflow provides a controlled way to remove the main infrastructure when it is no longer required.
-
-## Screenshots and evidence
+## Screenshots and Evidence
 
 Project evidence is organized under:
 
 ```text
-screenshots/
-├── application/
-├── docker/
-├── aws/
-├── terraform/
-└── cicd/
+tracker-ecs-project/
+├── screenshots/
+│   ├── application/
+│   ├── docker/
+│   ├── aws/
+│   └── cicd/
+│
+└── videos/
+    └── ecs-project.wmv
 ```
 
-The folders are intended for real screenshots captured during development, deployment, testing, and troubleshooting.
-
-Suggested evidence includes:
+The folders contain screenshots captured during development, deployment, testing, and troubleshooting.
 
 ### Application
 
-- Login/authentication
-- Task dashboard
-- Kanban board
-- List/table view
-- Filtering and search
-- Dark mode
+![Login](screenshots/application/login.png)
+
+![Kanban Board](screenshots/application/kanban.png)
+
+![List View](screenshots/application/list.png)
 
 ### Docker
 
-- Docker Compose
-- Running containers
-- Built images
+![Running Containers](screenshots/docker/running-containers.png)
 
 ### AWS
 
-- ECR repositories
-- ECS cluster and services
-- ALB
-- Target groups
-- RDS
-- VPC/subnets/security groups
-- CloudWatch Logs
+![ECS Cluster and Services](screenshots/aws/ecs.png)
 
-### Terraform
+![Target Groups](screenshots/aws/target-groups.png)
 
-- Terraform plan
-- Terraform apply
-- Terraform outputs
-- Terraform destroy
+![RDS PostgreSQL](screenshots/aws/rds.png)
+
+![VPC and Subnets](screenshots/aws/vpc.png)
+
+![S3 Bucket](screenshots/aws/S3-bucket.png)
 
 ### CI/CD
 
-- Application workflow
-- Terraform plan
-- Terraform deployment
-- Security scanning
-- Destroy workflow
+![Application Workflow](screenshots/cicd/application.png)
+
+![Terraform Plan Workflow](screenshots/cicd/terraform-plan.png)
+
+![Terraform Deployment](screenshots/cicd/terraform-deployment.png)
+
+![Destroy Workflow](screenshots/cicd/destroy.png)
 
 Historical AWS screenshots represent the environment during deployment and testing. They should not be interpreted as proof that the AWS environment is currently running.
 
 ## Key design decisions
 
-### PostgreSQL
+**PostgreSQL** — used both locally and in the AWS deployment.
 
-PostgreSQL was selected as the database for the project and is used both locally and in the AWS deployment.
+**ECS Fargate** — removes the need to manage EC2 instances for the container workloads.
 
-### ECS Fargate
+**Private ECS tasks** — frontend and backend ECS tasks run without public IP addresses; the ALB provides the public entry point while the application workloads stay inside private subnets.
 
-Fargate removes the need to manage EC2 instances for the container workloads and provides a simpler managed container runtime for this project.
+**Private RDS** — the database is isolated in private database subnets and is reachable only from the application tier through security-group rules.
 
-### Private ECS tasks
+**VPC endpoints instead of NAT Gateway** — provides the AWS service connectivity required by the private application tier without the ongoing cost of a NAT Gateway.
 
-The frontend and backend ECS tasks run without public IP addresses.
+**Terraform** — makes the AWS environment reproducible rather than dependent on manual AWS Console configuration.
 
-The ALB provides the public entry point while the application workloads remain inside private subnets.
+**GitHub OIDC** — removes the need for long-lived AWS credentials in GitHub Actions.
 
-### Private RDS
+**Immutable image deployment** — image digests provide a deterministic reference to the exact container image deployed to ECS.
 
-The database is isolated in private database subnets and is only accessible from the application tier through security-group rules.
-
-### VPC endpoints instead of NAT Gateway
-
-VPC endpoints provide the AWS service connectivity required by the private application tier without introducing a NAT Gateway.
-
-This reduces the infrastructure cost for a small learning project.
-
-### Terraform
-
-Terraform provides repeatable infrastructure deployment and makes the AWS environment reproducible rather than dependent on manual ClickOps configuration.
-
-### GitHub OIDC
-
-OIDC removes the need for long-lived AWS credentials in GitHub Actions.
-
-### Immutable image deployment
-
-Image digests provide a deterministic reference to the container image deployed to ECS.
-
-### Cloudflare
-
-Cloudflare provides the DNS and edge layer in front of the AWS ALB. Route 53 is not required for this architecture.
+**Cloudflare** — provides the DNS and edge layer in front of the AWS ALB; Route 53 is not used in this architecture.
 
 ## What I learned
 
-This project provided practical experience with:
+This project provided practical experience with Linux, Git and GitHub, Docker, Docker Compose, Node.js, PostgreSQL, AWS VPC networking, public and private subnets, route tables, security groups, VPC endpoints, ECS Fargate, Application Load Balancer, Amazon ECR, immutable container images, Amazon RDS, AWS Secrets Manager, CloudWatch Logs, AWS Certificate Manager, Cloudflare, IAM, GitHub Actions, GitHub OIDC, Terraform, Terraform remote state, TFLint, tfsec, infrastructure deployment and destruction, private AWS networking troubleshooting, and cost-aware AWS architecture design.
 
-- Linux
-- Git and GitHub
-- Docker
-- Docker Compose
-- React
-- Node.js
-- PostgreSQL
-- AWS VPC networking
-- Public and private subnets
-- Route tables
-- Security groups
-- VPC endpoints
-- ECS Fargate
-- Application Load Balancer
-- Amazon ECR
-- Amazon RDS
-- AWS Secrets Manager
-- IAM
-- GitHub OIDC
-- GitHub Actions
-- Terraform
-- Terraform remote state
-- TFLint
-- tfsec
-- Cloudflare
-- ACM
-- Infrastructure deployment and destruction
-- Troubleshooting private AWS networking
-
-The project also reinforced the importance of validating infrastructure behavior rather than assuming that a successful Terraform apply means the application is working correctly.
-
-## Project status
-
-The following project areas were completed and tested:
-
-- Full-stack task/project tracker
-- Authentication and authorization
-- JWT-based authentication
-- PostgreSQL database
-- Docker and Docker Compose
-- Frontend and backend container images
-- Amazon ECR
-- AWS VPC networking
-- Public and private subnet architecture
-- Security groups
-- VPC endpoints
-- Amazon ECS Fargate
-- Application Load Balancer
-- Private RDS PostgreSQL
-- AWS Secrets Manager integration
-- Cloudflare DNS/TLS
-- Terraform Infrastructure as Code
-- Terraform remote state
-- GitHub Actions CI/CD
-- GitHub OIDC authentication
-- Terraform formatting and validation
-- TFLint
-- tfsec security scanning
-- Immutable container image deployment
-- Controlled Terraform destroy workflow
-- AWS deployment and application validation
-
-The AWS infrastructure was subsequently destroyed to avoid ongoing costs.
-
-## Notes for maintainers
-
-- The root `README.md` documents the overall project.
-- `bootstrap/README.md` documents the Terraform backend bootstrap process.
-- Terraform configuration under `terraform/` is the source of truth for AWS infrastructure.
-- GitHub Actions workflows under `.github/workflows/` are the source of truth for CI/CD behavior.
-- Do not describe the AWS environment as currently running unless it has actually been redeployed.
-- Keep documentation aligned with the actual Terraform configuration and workflow files.
-- Avoid committing credentials, passwords, tokens, or other sensitive configuration.
+The project also reinforced the importance of validating infrastructure behavior directly by testing live endpoints and checking ECS task and service status rather than assuming that a successful `terraform apply` alone means the application is working correctly.
