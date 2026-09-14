@@ -388,7 +388,7 @@ Cost control was an important part of the infrastructure design:
 
 Because this is a learning and portfolio project, the `terraform-destroy` GitHub Actions workflow provides a controlled, confirmation-gated way to remove the main infrastructure whenever it is not actively needed, helping avoid unnecessary ongoing costs.
 
-## Screenshots and Evidence
+## Screenshots
 
 Project evidence is organized under:
 
